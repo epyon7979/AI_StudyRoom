@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude 중급 01 — 계정 전체 지침으로 반복 설명 없애기</title>
+<style>
+/* ==========================================================================
+   Anthropic 제품 교육 커리큘럼 — 공용 스타일시트
+   버전: v1.1 / 확정일: 2026-08-19 (v1.1: 2026-08-20 .checkpoint 추가)
+   적용 대상: index.html, glossary.html, 모든 모듈 HTML 파일
+   원칙: 외부 CDN·웹폰트·이미지 참조 없음(오프라인 열람 가능)
+   사용법: 이 블록 전체를 각 파일의 <style> 안에 그대로 복사한다.
+          수정 시 기존 모든 파일에 동일하게 반영한다.
+   ========================================================================== */
+
+/* --- 1. 토큰 ------------------------------------------------------------ */
+:root{
+  --ink:#1B1F24;
+  --body:#3A3F46;
+  --muted:#6B7280;
+  --line:#E6E9EE;
+  --line-strong:#D2D9E3;
+  --bg:#FFFFFF;
+  --bg-soft:#F7F9FC;
+  --bg-practice:#F3F7FC;
+  --bg-code:#1E2430;
+
+  --blue:#2F6FCB;
+  --blue-dark:#255AA8;
+  --accent:#E2612B;
+
+  --track-basic:#2F6FCB;
+  --track-custom:#0E8A6B;
+  --track-advanced:#7A3E9D;
+  --track:var(--blue);          /* body[data-track]에서 덮어씀 */
+
+  --info:#2F6FCB;   --info-bg:#F0F5FC;
+  --tip:#0E8A6B;    --tip-bg:#EEF7F3;
+  --warn:#B76A08;   --warn-bg:#FDF6EA;
+  --danger:#C0392B; --danger-bg:#FDF1EF;
+
+  --st-todo:#6B7280;   --st-todo-bg:#F1F3F6;
+  --st-planned:#2F6FCB;--st-planned-bg:#EDF3FC;
+  --st-writing:#B76A08;--st-writing-bg:#FDF6EA;
+  --st-done:#0E8A6B;   --st-done-bg:#EAF6F1;
+  --st-mockup:#0E7C86; --st-mockup-bg:#E9F6F7;
+  --anno-red:#DC2626;
+
+  --radius:10px;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Apple SD Gothic Neo",
+         "Malgun Gothic","맑은 고딕","Noto Sans KR",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"D2Coding",
+         "Nanum Gothic Coding","Courier New",monospace;
+}
+
+/* 트랙별 강조색: <body data-track="basic|custom|advanced"> */
+body[data-track="basic"]   { --track:var(--track-basic); }
+body[data-track="custom"]  { --track:var(--track-custom); }
+body[data-track="advanced"]{ --track:var(--track-advanced); }
+
+/* --- 2. 기본 ------------------------------------------------------------ */
+*{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15.5px;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+.page{ max-width:940px; margin:0 auto; padding:0 24px 64px; }
+p{ margin:0 0 12px; color:var(--body); }
+a{ color:var(--blue-dark); }
+a:hover{ color:var(--accent); }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+hr{ border:0; border-top:1px solid var(--line); margin:28px 0; }
+small{ font-size:13px; color:var(--muted); }
+
+/* --- 3. 상단 내비게이션 -------------------------------------------------- */
+.topbar{
+  position:sticky; top:0; z-index:20;
+  background:rgba(255,255,255,.96);
+  border-bottom:1px solid var(--line);
+  backdrop-filter:saturate(180%) blur(6px);
+}
+.topbar-inner{
+  max-width:940px; margin:0 auto; padding:10px 24px;
+  display:flex; flex-wrap:nowrap; gap:10px 14px; align-items:center;
+  justify-content:flex-start; min-width:0;
+}
+.topbar-tags{
+  display:flex; flex:0 0 auto; flex-wrap:nowrap; gap:6px; align-items:center;
+}
+.topbar-nav{
+  display:flex; flex:1 1 auto; min-width:0; flex-wrap:nowrap; gap:6px; align-items:center;
+}
+.navlink{
+  display:inline-block; flex:0 0 auto; padding:5px 11px; border-radius:999px;
+  border:1px solid var(--line-strong); background:#fff;
+  font-size:13px; font-weight:600; color:var(--body); text-decoration:none;
+  white-space:nowrap;
+}
+/* 이전/다음만 남은 폭 안에서 줄어들며 제목을 말줄임표 처리한다. */
+.topbar-nav .navlink-step{
+  flex:0 1 auto; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.navlink:hover{ border-color:var(--track); color:var(--track); }
+.navlink.current{ background:var(--bg-soft); color:var(--muted); border-style:dashed; }
+.navlink.disabled{
+  color:#AEB4BD; border-color:var(--line); background:var(--bg-soft);
+  pointer-events:none; cursor:default;
+}
+
+/* --- 3b. 코스 사이드바 ---------------------------------------------------- */
+.layout{ display:flex; align-items:flex-start; width:100%; max-width:1180px; margin:0 auto; }
+.layout > .page{ flex:1 1 0; min-width:0; }
+.sidebar{
+  position:sticky; top:53px; flex:0 0 240px; width:240px;
+  max-height:calc(100vh - 53px); overflow-y:auto;
+  padding:18px 12px 40px 24px; box-sizing:border-box;
+  border-right:1px solid var(--line);
+  transition:margin-left .15s ease, opacity .15s ease;
+}
+.sidebar-title{
+  font-size:11px; font-weight:800; letter-spacing:.04em; color:var(--muted);
+  text-transform:uppercase; margin:0 0 10px; padding:0 4px;
+}
+.sb-course{ margin-bottom:2px; }
+.sb-course-btn{
+  display:flex; align-items:center; gap:7px; width:100%;
+  background:none; border:0; padding:7px 4px; cursor:pointer;
+  font-family:var(--sans); font-size:13.5px; font-weight:700; color:var(--ink);
+  text-align:left; border-radius:6px;
+}
+.sb-course-btn:hover{ background:var(--bg-soft); }
+.sb-course-btn .sb-caret{
+  display:inline-block; width:9px; height:9px; flex-shrink:0;
+  border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
+  transform:rotate(-45deg); transition:transform .15s ease;
+}
+.sb-course.open .sb-course-btn .sb-caret{ transform:rotate(45deg); }
+.sb-course-btn .sb-dot{
+  width:6px; height:6px; border-radius:50%; flex-shrink:0; background:var(--st-todo);
+}
+.sb-course-btn[data-status="done"] .sb-dot{ background:var(--st-done); }
+.sb-course-btn[data-status="writing"] .sb-dot{ background:var(--st-writing); }
+.sb-course-btn[data-status="planned"] .sb-dot{ background:var(--st-planned); }
+.sb-course-btn .sb-course-name{ flex:1 1 auto; }
+.sb-modules{
+  list-style:none; margin:0 0 6px; padding:0 0 0 15px;
+  display:none; border-left:1px solid var(--line); margin-left:8px;
+}
+.sb-course.open .sb-modules{ display:block; }
+.sb-modules li{ margin:0; }
+.sb-modules a{
+  display:block; padding:5px 8px; margin:1px 0;
+  font-size:12.5px; line-height:1.5; color:var(--body); text-decoration:none;
+  border-radius:5px; border-left:2px solid transparent;
+}
+.sb-modules a:hover{ background:var(--bg-soft); color:var(--track); }
+.sb-modules a .sb-no{ color:var(--muted); font-weight:700; margin-right:5px; }
+.sb-modules a.current{
+  background:var(--bg-soft); color:var(--track); font-weight:700;
+  border-left-color:var(--track);
+}
+.sb-empty{ padding:5px 8px; font-size:12px; color:var(--muted); }
+.sidebar-backdrop{ display:none; }
+
+/* 상단 topbar 맨 왼쪽(제품 태그보다 앞) 햄버거 버튼 — topbar-inner의 일반 flex 아이템이라
+   topbar가 sticky이므로 스크롤해도 함께 고정되고, 사이드바 열림/닫힘과 무관하게 항상 같은 자리 */
+.sb-fab{
+  flex:0 0 auto; order:-1;
+  width:30px; height:30px; padding:0; border-radius:7px;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--line-strong); background:#fff; cursor:pointer;
+  position:relative; z-index:1;
+}
+.sb-fab:hover{ border-color:var(--track); }
+.sb-fab .sb-fab-bar{
+  display:block; width:14px; height:2px; background:var(--body); border-radius:1px;
+  position:relative;
+}
+.sb-fab .sb-fab-bar::before, .sb-fab .sb-fab-bar::after{
+  content:""; position:absolute; left:0; width:14px; height:2px;
+  background:var(--body); border-radius:1px;
+}
+.sb-fab .sb-fab-bar::before{ top:-4px; }
+.sb-fab .sb-fab-bar::after{ top:4px; }
+
+/* 데스크톱: 사이드바 숨김 시 폭을 반환(오버레이 아님) */
+body.sidebar-hidden .sidebar{
+  width:0; flex-basis:0; padding-left:0; padding-right:0; border-right:0;
+  overflow:hidden; opacity:0; margin-left:-1px;
+}
+
+@media (max-width:960px){
+  .layout{ display:block; }
+  .sidebar{
+    position:fixed; top:var(--curriculum-topbar-height, 53px); left:0; z-index:40;
+    height:calc(100vh - var(--curriculum-topbar-height, 53px)); max-height:none; width:280px;
+    background:#fff; border-right:1px solid var(--line-strong);
+    padding:16px 14px 40px 24px;
+    transform:translateX(-100%); transition:transform .2s ease;
+    box-shadow:2px 0 18px rgba(0,0,0,.12);
+    opacity:1; /* 데스크톱 전용 opacity 규칙 무효화 */
+  }
+  /* 모바일에서는 기본이 숨김 상태. sidebar-hidden이 아니라 sidebar-open일 때만 보임 */
+  body.sidebar-open .sidebar{ transform:translateX(0); }
+  body.sidebar-hidden .sidebar{ width:280px; flex-basis:auto; overflow:visible; margin-left:0; }
+  .sidebar-backdrop{
+    display:none; position:fixed; inset:0; z-index:30;
+    background:rgba(20,24,30,.35);
+  }
+  body.sidebar-open .sidebar-backdrop{ display:block; }
+
+  /* .topbar(z-index:20, §10 공용 CSS)는 기본적으로 사이드바(40)·백드롭(30)보다
+     쌓임 순서가 낮다 — 자식 .sb-fab에 아무리 높은 z-index를 줘도 부모의
+     스택 컨텍스트를 벗어날 수 없으므로, 사이드바가 열린 동안만 topbar
+     자체의 z-index를 둘 다보다 높여 햄버거 버튼이 항상 눌리게 한다.
+     (이걸 하지 않으면 모바일에서 사이드바를 열고 나면 버튼이 그 뒤에
+     가려져 다시 눌러 닫을 방법이 없어진다.) */
+  body.sidebar-open .topbar{ z-index:41; }
+}
+
+/* --- 4. 태그 / 배지 ------------------------------------------------------ */
+.tag{
+  display:inline-block; padding:3px 10px; border-radius:999px;
+  font-size:12px; font-weight:700; line-height:1.6; white-space:nowrap;
+  border:1px solid transparent;
+}
+.tag-product{ background:#EEF1F5; color:#333A44; border-color:#DDE2E9; }
+.tag-basic{ background:#EDF3FC; color:var(--track-basic); border-color:#CFE0F6; }
+.tag-custom{ background:#EAF6F1; color:var(--track-custom); border-color:#C8E7DC; }
+.tag-advanced{ background:#F4EDFA; color:var(--track-advanced); border-color:#E0CDEF; }
+.tag-beta{ background:#FDF6EA; color:var(--warn); border-color:#F3E0BC; }
+.tag-muted{ background:#F1F3F6; color:var(--muted); border-color:#E3E7EC; }
+
+.status{
+  display:inline-block; padding:3px 10px; border-radius:6px;
+  font-size:12px; font-weight:700; white-space:nowrap;
+}
+.status-todo{ background:var(--st-todo-bg); color:var(--st-todo); }
+.status-planned{ background:var(--st-planned-bg); color:var(--st-planned); }
+.status-writing{ background:var(--st-writing-bg); color:var(--st-writing); }
+.status-done{ background:var(--st-done-bg); color:var(--st-done); }
+.status-mockup{ background:var(--st-mockup-bg); color:var(--st-mockup); }
+
+.unverified{
+  display:inline-block; padding:2px 8px; border-radius:6px;
+  background:var(--warn-bg); color:var(--warn);
+  font-size:12px; font-weight:700; border:1px dashed #EBD3A8;
+}
+
+/* --- 5. 문서 머리말 ------------------------------------------------------ */
+.doc-header{ padding:32px 0 20px; border-bottom:3px solid var(--track); margin-bottom:28px; }
+.eyebrow{
+  font-size:12.5px; font-weight:700; letter-spacing:.06em;
+  color:var(--track); text-transform:uppercase; margin:0 0 6px;
+}
+h1{ font-size:27px; font-weight:800; letter-spacing:-.01em; margin:0 0 10px; line-height:1.4; }
+h1 .hl{ color:var(--accent); }
+.lede{ font-size:15.5px; color:var(--body); margin:0; max-width:70ch; }
+
+h2{
+  font-size:20px; font-weight:800; margin:36px 0 12px; padding-left:12px;
+  border-left:5px solid var(--track); line-height:1.5;
+}
+h3{ font-size:16.5px; font-weight:700; margin:22px 0 8px; }
+h4{ font-size:15px; font-weight:700; margin:16px 0 6px; color:var(--body); }
+
+/* --- 6. 모듈 정보(메타) -------------------------------------------------- */
+.meta{
+  display:grid; grid-template-columns:150px 1fr; gap:1px;
+  background:var(--line); border:1px solid var(--line);
+  border-radius:var(--radius); overflow:hidden; margin:0 0 24px;
+}
+.meta dt{ background:var(--bg-soft); padding:9px 14px; font-size:13.5px; font-weight:700; }
+.meta dd{ background:#fff; padding:9px 14px; margin:0; font-size:13.5px; color:var(--body); }
+
+/* --- 7. 섹션(설명 영역 / 실습 영역) -------------------------------------- */
+.section{
+  background:#fff; border:1px solid var(--line); border-radius:var(--radius);
+  padding:20px 22px; margin:0 0 20px;
+}
+.section.practice{
+  background:var(--bg-practice); border-color:#D9E4F2;
+  border-left:5px solid var(--track);
+}
+.section > :first-child{ margin-top:0; }
+.section > :last-child{ margin-bottom:0; }
+.section-kind{
+  display:inline-block; margin:0 0 10px; padding:2px 9px; border-radius:5px;
+  font-size:12px; font-weight:700; letter-spacing:.02em;
+  background:#EEF1F5; color:#4B535D;
+}
+.section.practice .section-kind{ background:var(--track); color:#fff; }
+
+/* --- 8. 목록 / 단계 ------------------------------------------------------ */
+ul,ol{ margin:0 0 12px; padding-left:22px; color:var(--body); }
+li{ margin:3px 0; }
+
+.steps{ list-style:none; counter-reset:step; padding:0; margin:14px 0; }
+.steps > li{
+  counter-increment:step; position:relative;
+  padding:0 0 16px 40px; margin:0;
+  border-left:2px solid var(--line-strong); margin-left:13px;
+}
+.steps > li:last-child{ border-left-color:transparent; padding-bottom:0; }
+.steps > li::before{
+  content:counter(step,decimal-leading-zero);
+  position:absolute; left:-14px; top:0;
+  width:27px; height:27px; border-radius:50%;
+  background:var(--track); color:#fff;
+  font-size:12px; font-weight:700; font-family:var(--mono);
+  display:flex; align-items:center; justify-content:center;
+}
+.step-title{ font-weight:700; color:var(--ink); display:block; margin-bottom:4px; }
+
+/* --- 8b. 구간 체크 (긴 실습의 중간 점검) -------------------------------- */
+.checkpoint{
+  border:1px dashed var(--track); border-left:5px solid var(--track);
+  border-radius:8px; background:var(--bg-soft);
+  padding:12px 16px; margin:16px 0 4px;
+}
+.checkpoint-title{
+  display:block; font-weight:700; font-size:13.5px;
+  color:var(--track); margin-bottom:6px; letter-spacing:.01em;
+}
+.checkpoint ul{ margin:0; padding-left:20px; }
+.checkpoint li{ font-size:14px; margin:2px 0; }
+.checkpoint p{ font-size:14px; margin:6px 0 0; }
+
+/* --- 9. 코드 블록 -------------------------------------------------------- */
+pre{
+  background:var(--bg-code); color:#E8EDF5;
+  border-radius:8px; padding:14px 16px; margin:10px 0 14px;
+  overflow-x:auto; line-height:1.65;
+}
+pre code{
+  font-family:var(--mono); font-size:13px;
+  background:none; color:inherit; padding:0; border:0; white-space:pre;
+}
+code{
+  font-family:var(--mono); font-size:.9em;
+  background:#EEF1F5; color:#243044;
+  padding:1px 5px; border-radius:4px; border:1px solid #E1E6EC;
+}
+.code-label{
+  display:inline-block; margin:12px 0 0; padding:3px 10px;
+  border-radius:6px 6px 0 0; background:#2B3444; color:#C9D4E3;
+  font-family:var(--mono); font-size:11.5px; font-weight:700;
+}
+.code-label + pre{ margin-top:0; border-top-left-radius:0; }
+.code-caption{ font-size:12.5px; color:var(--muted); margin:-8px 0 14px; }
+
+/* UI 명칭·메뉴 경로 표기 */
+.ui{ font-weight:700; color:var(--ink); }
+.path{ font-family:var(--mono); font-size:.92em; color:var(--blue-dark); }
+
+/* --- 10. 콜아웃(경고·주의 박스) ------------------------------------------ */
+.callout{
+  border:1px solid; border-left-width:5px; border-radius:8px;
+  padding:12px 16px; margin:14px 0;
+}
+.callout > :first-child{ margin-top:0; }
+.callout > :last-child{ margin-bottom:0; }
+.callout-title{ display:block; font-weight:700; font-size:14px; margin-bottom:4px; }
+.callout p, .callout li{ font-size:14.5px; }
+.callout-info{ background:var(--info-bg); border-color:#CFE0F6; border-left-color:var(--info); }
+.callout-info .callout-title{ color:var(--info); }
+.callout-tip{ background:var(--tip-bg); border-color:#C8E7DC; border-left-color:var(--tip); }
+.callout-tip .callout-title{ color:var(--tip); }
+.callout-warn{ background:var(--warn-bg); border-color:#F3E0BC; border-left-color:var(--warn); }
+.callout-warn .callout-title{ color:var(--warn); }
+.callout-danger{ background:var(--danger-bg); border-color:#F5CFC9; border-left-color:var(--danger); }
+.callout-danger .callout-title{ color:var(--danger); }
+
+/* --- 11. 체크리스트 ------------------------------------------------------ */
+.checklist{ list-style:none; padding:0; margin:12px 0; }
+.checklist li{
+  display:flex; gap:10px; align-items:flex-start;
+  padding:9px 13px; margin:0 0 7px;
+  background:#fff; border:1px solid var(--line); border-radius:8px;
+  font-size:14.5px; color:var(--body);
+}
+.checklist input[type="checkbox"]{
+  width:16px; height:16px; margin:5px 0 0; flex-shrink:0;
+  accent-color:var(--track); cursor:pointer;
+}
+.checklist label{ cursor:pointer; }
+
+/* --- 12. 표 -------------------------------------------------------------- */
+.table-wrap{ overflow-x:auto; margin:12px 0 18px; }
+table{
+  width:100%; border-collapse:collapse;
+  border:1px solid var(--line); border-radius:var(--radius);
+  overflow:hidden; font-size:14px;
+}
+thead th{
+  background:var(--blue); color:#fff; font-weight:700;
+  text-align:left; padding:9px 13px; white-space:nowrap;
+}
+tbody td, tbody th{
+  border-top:1px solid var(--line); padding:9px 13px;
+  color:var(--body); vertical-align:top; text-align:left;
+}
+tbody th{ font-weight:700; color:var(--ink); background:var(--bg-soft); }
+tbody tr:nth-child(even) td{ background:var(--bg-soft); }
+td code, th code{ white-space:nowrap; }
+
+/* --- 13. 캡처 지시서 / 자리표시 ------------------------------------------ */
+.capture{
+  border:1px solid var(--line-strong); border-radius:8px;
+  background:#fff; margin:14px 0; overflow:hidden;
+}
+.capture-head{
+  background:#2B3444; color:#fff; padding:7px 14px;
+  font-size:13px; font-weight:700; font-family:var(--mono);
+}
+.capture dl{
+  display:grid; grid-template-columns:96px 1fr; gap:0;
+  margin:0; padding:10px 14px; font-size:13.5px;
+}
+.capture dt{ font-weight:700; color:var(--ink); padding:3px 0; }
+.capture dd{ margin:0; padding:3px 0; color:var(--body); }
+
+.screenshot-placeholder{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:130px; padding:22px 18px; margin:12px 0 16px;
+  border:2px dashed var(--line-strong); border-radius:8px;
+  background:repeating-linear-gradient(45deg,#FAFBFD,#FAFBFD 10px,#F3F6FA 10px,#F3F6FA 20px);
+  text-align:center;
+}
+.screenshot-placeholder .ph-no{
+  font-family:var(--mono); font-size:12.5px; font-weight:700;
+  color:#fff; background:#2B3444; padding:2px 9px; border-radius:5px; margin-bottom:8px;
+}
+.screenshot-placeholder .ph-desc{ font-size:13.5px; color:var(--muted); margin:0; max-width:52ch; }
+figure{ margin:12px 0 16px; }
+figure img{ max-width:100%; height:auto; border:1px solid var(--line-strong); border-radius:8px; display:block; }
+figcaption{ font-size:13px; color:var(--muted); margin-top:6px; }
+
+/* --- 13b. 목업(실촬영 대체) — 캡처 불가 시 HTML/CSS 근사 재현 --------------
+   실제 화면을 촬영할 수 없을 때(계정 데이터 훼손·계정 설정 변경 등 학습자
+   동의 없이는 할 수 없는 경우, 또는 CLI·브라우저 재현) 쓰는 근사 재현
+   컴포넌트. .capture-head와 짝을 이루되 색·형태로 구분해 실제 캡처
+   (.screenshot-placeholder, <figure><img>)와 시각적으로 구별한다.
+   §7-3 참고, 실제 화면과 다를 수 있음.
+   - .mock-note, .tui*, .browser-mock*, .chip, .btn-* : 터미널·브라우저 UI 근사
+   - .mockup-figure, .mkchat-*, .mkmodal-*, .mkmemory-* : 채팅·모달 UI 근사
+   ========================================================================== */
+
+.mock-note{
+  display:block;
+  background:var(--warn-bg); border:1px dashed #EBD3A8; border-radius:8px;
+  padding:9px 13px; margin:12px 0; font-size:13px; color:#7A5716; line-height:1.65;
+}
+.mock-note b{ color:var(--warn); margin-right:4px; }
+.tui{
+  border-radius:8px; overflow:hidden; margin:10px 0 16px;
+  border:1px solid #11151D; box-shadow:0 1px 3px rgba(0,0,0,.15);
+}
+.tui-bar{
+  background:#2B3444; color:#9AA6B8; padding:7px 12px;
+  font-family:var(--mono); font-size:11px; font-weight:700;
+  display:flex; align-items:center; gap:7px;
+}
+.tui-bar .dot{ width:9px; height:9px; border-radius:50%; background:#4A5468; display:inline-block; }
+.tui-body{
+  background:var(--bg-code); color:#DCE3ED;
+  font-family:var(--mono); font-size:12.5px; line-height:1.7;
+  padding:14px 16px; white-space:pre-wrap; overflow-x:auto; margin:0; border:0;
+}
+.tui-body .dim{ color:#7C8797; }
+.tui-body .accent{ color:#7FB0F2; }
+.tui-body .warn{ color:#E8B85C; }
+.tui-body .good{ color:#7FCF9F; }
+.tui-body .danger{ color:#E5877A; }
+.tui-body .hl{
+  display:inline-block; outline:2px solid var(--accent); outline-offset:2px; border-radius:3px;
+}
+.browser-mock{
+  border-radius:8px; overflow:hidden; margin:10px 0 16px;
+  border:1px solid var(--line-strong); background:#fff;
+}
+.browser-bar{
+  background:#EEF1F5; border-bottom:1px solid var(--line-strong);
+  padding:8px 12px; display:flex; align-items:center; gap:8px;
+}
+.browser-bar .dot{ width:9px; height:9px; border-radius:50%; background:#D5DAE1; display:inline-block; }
+.browser-url{
+  flex:1; background:#fff; border:1px solid var(--line-strong); border-radius:999px;
+  padding:4px 12px; font-family:var(--mono); font-size:11.5px; color:var(--muted);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.browser-content{ padding:26px 28px; }
+.browser-content h4{ margin:0 0 6px; font-size:15.5px; color:var(--ink); }
+.browser-content p{ font-size:13.5px; }
+.chip{
+  display:inline-flex; align-items:center; gap:6px; padding:5px 11px;
+  border:1px solid var(--line-strong); border-radius:999px; font-size:12.5px;
+  color:var(--body); background:var(--bg-soft); margin:6px 0;
+}
+.btn-row{ display:flex; gap:10px; margin-top:16px; }
+.btn-mock{
+  padding:8px 16px; border-radius:7px; font-size:13.5px; font-weight:700;
+  border:1px solid var(--line-strong); background:#fff; color:var(--body);
+}
+.btn-mock.primary{ background:var(--track); color:#fff; border-color:var(--track); }
+.btn-mock.hl{ outline:2px solid var(--accent); outline-offset:2px; }
+
+.mockup-figure{
+  border:1px solid var(--line-strong); border-radius:8px;
+  background:#fff; margin:12px 0 16px; overflow:hidden;
+}
+.mockup-head{
+  background:var(--st-mockup); color:#fff; padding:7px 14px;
+  font-size:13px; font-weight:700; font-family:var(--mono);
+}
+.mockup-screen{
+  margin:14px; border:1px solid var(--line-strong); border-radius:8px;
+  background:#fff; overflow:hidden;
+}
+.mockup-figure figcaption{ padding:0 14px 14px; margin-top:0; }
+.mockup-caption{ font-size:13px; color:var(--body); margin:10px 0 8px; }
+.mockup-caption b{ color:var(--ink); }
+.mockup-note{
+  font-size:12.5px; color:var(--body); background:var(--st-mockup-bg);
+  border:1px solid #C6E7EA; border-radius:6px; padding:9px 11px; margin:0;
+}
+.mockup-note b{ color:var(--st-mockup); }
+
+/* claude.ai 대화 화면 근사 — 배색·구도만 근사, 실제 화면과 다를 수 있음 */
+.mkchat{ padding:20px 22px 22px; }
+.mkchat-user-row{ display:flex; justify-content:flex-end; margin:0 0 18px; }
+.mkchat-bubble{
+  max-width:74%; background:#F0EEE6; color:var(--ink);
+  border-radius:16px; padding:9px 15px; font-size:13.5px; line-height:1.5;
+}
+.mkchat-assistant-row{ display:flex; gap:11px; align-items:flex-start; }
+.mkchat-avatar{
+  flex:0 0 auto; width:22px; height:22px; margin-top:1px;
+  border-radius:7px; background:#D97757;
+}
+.mkchat-body{ flex:1 1 auto; min-width:0; }
+.mkchat-lead{
+  display:inline-block; font-weight:700; font-size:14px; color:var(--ink);
+  border:2px solid var(--anno-red); border-radius:6px;
+  padding:5px 10px; margin:0 0 10px; line-height:1.4;
+}
+.mkchat-list{ margin:0; padding-left:19px; }
+.mkchat-list li{ font-size:13.5px; color:var(--body); margin:4px 0; }
+
+/* claude.ai 모달/목록 화면 근사 — 배색·구도만 근사, 실제 화면과 다를 수 있음 */
+.mkmodal-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 20px; border-bottom:1px solid var(--line);
+  font-size:14.5px; font-weight:700; color:var(--ink);
+}
+.mkmodal-close{ font-size:16px; color:var(--muted); line-height:1; font-weight:400; }
+.mkmemory-list{ list-style:none; margin:0; padding:6px 20px 18px; }
+.mkmemory-list li{ padding:12px 0; border-top:1px solid var(--line); }
+.mkmemory-list li:first-child{ border-top:0; }
+.mkmemory-title{ display:block; font-size:13.5px; font-weight:700; color:var(--ink); margin-bottom:3px; }
+.mkmemory-list p{ margin:0; font-size:12.5px; color:var(--muted); }
+
+/* --- 14. 출처 / 참고 자료 ------------------------------------------------ */
+.src{ font-size:12.5px; color:var(--muted); }
+.reflist{ list-style:none; padding:0; margin:10px 0; }
+.reflist li{
+  padding:8px 0; border-bottom:1px dashed var(--line); font-size:13.5px; color:var(--body);
+}
+.reflist li:last-child{ border-bottom:0; }
+.reflist .ref-date{ color:var(--muted); font-size:12.5px; }
+
+/* --- 15. index.html 전용 ------------------------------------------------- */
+.progress{
+  display:flex; flex-wrap:wrap; gap:10px; margin:0 0 24px;
+}
+.progress-card{
+  flex:1 1 200px; border:1px solid var(--line); border-radius:var(--radius);
+  background:var(--bg-soft); padding:14px 16px;
+}
+.progress-card .pc-label{ font-size:12.5px; font-weight:700; color:var(--muted); display:block; }
+.progress-card .pc-value{ font-size:22px; font-weight:800; color:var(--ink); font-family:var(--mono); }
+.progress-card .pc-note{ font-size:12.5px; color:var(--muted); display:block; margin-top:2px; }
+
+.part{ margin:0 0 10px; }
+.course{
+  border:1px solid var(--line); border-left:5px solid var(--track);
+  border-radius:var(--radius); background:#fff; padding:16px 18px; margin:0 0 14px;
+}
+.course[data-track="basic"]{ --track:var(--track-basic); }
+.course[data-track="custom"]{ --track:var(--track-custom); }
+.course[data-track="advanced"]{ --track:var(--track-advanced); }
+.course-head{
+  display:flex; flex-wrap:wrap; gap:8px 12px;
+  align-items:center; justify-content:space-between; margin-bottom:8px;
+}
+.course-head h3{ margin:0; font-size:16.5px; }
+.course-id{ display:flex; flex-wrap:wrap; gap:7px; align-items:center; }
+.course-note{ font-size:13.5px; color:var(--muted); margin:0 0 10px; }
+.module-table{ font-size:13.5px; }
+.module-table .mod-no{ font-family:var(--mono); font-weight:700; white-space:nowrap; }
+.module-table .empty-row td{
+  text-align:center; color:var(--muted); font-size:13px;
+  background:var(--bg-soft); padding:14px;
+}
+
+/* --- 16. glossary.html 전용 --------------------------------------------- */
+.filter-bar{ margin:0 0 18px; }
+.filter-bar input{
+  width:100%; max-width:420px; padding:9px 13px;
+  border:1px solid var(--line-strong); border-radius:8px;
+  font-family:var(--sans); font-size:14.5px; color:var(--ink); background:#fff;
+}
+.filter-bar input:focus{ outline:2px solid var(--track); outline-offset:1px; }
+.filter-count{ font-size:13px; color:var(--muted); margin-left:10px; }
+.term-table td:first-child{ width:230px; }
+.term{ font-weight:700; color:var(--ink); display:block; }
+.term-en{ font-family:var(--mono); font-size:12.5px; color:var(--muted); display:block; }
+.term-row.is-hidden{ display:none; }
+.no-result{ padding:18px; text-align:center; color:var(--muted); font-size:14px; }
+
+/* --- 17. 푸터 ----------------------------------------------------------- */
+.doc-footer{
+  margin-top:40px; padding-top:16px; border-top:1px solid var(--line);
+  font-size:13px; color:var(--muted);
+  display:flex; flex-wrap:wrap; gap:6px 18px; justify-content:space-between;
+}
+.doc-footer .checked-date{ font-weight:700; color:var(--body); }
+
+/* --- 18. 반응형 --------------------------------------------------------- */
+@media (max-width:720px){
+  body{ font-size:15px; }
+  .page{ padding:0 16px 48px; }
+  .topbar-inner{
+    padding:9px 16px;
+    overflow-x:auto; overflow-y:hidden;
+    scrollbar-width:none; overscroll-behavior-x:contain;
+  }
+  .topbar-inner::-webkit-scrollbar{ display:none; }
+  .topbar-nav{ flex:0 0 auto; }
+  .topbar-nav .navlink-step{ max-width:180px; }
+  h1{ font-size:23px; }
+  h2{ font-size:18px; }
+  .meta{ grid-template-columns:1fr; }
+  .meta dt{ padding-bottom:2px; }
+  .capture dl{ grid-template-columns:1fr; }
+  .capture dt{ padding-bottom:0; }
+  .term-table td:first-child{ width:auto; }
+  .section{ padding:16px; }
+  .mkchat{ padding:16px; }
+  .mkchat-bubble{ max-width:86%; }
+  .mkmodal-head{ padding:14px 16px; }
+  .mkmemory-list{ padding:4px 16px 16px; }
+}
+
+/* --- 19. 인쇄 ----------------------------------------------------------- */
+@media print{
+  .topbar, .filter-bar, .sidebar, .sidebar-backdrop, .sb-fab{ display:none; }
+  body{ font-size:11pt; }
+  .page{ max-width:none; padding:0; }
+  .layout{ display:block; max-width:none; }
+  .section, .course, .callout, .capture, .checklist li, .mockup-figure, .tui, .browser-mock{
+    break-inside:avoid; page-break-inside:avoid;
+  }
+  pre{ background:#F2F4F7; color:#111; border:1px solid #CCC; white-space:pre-wrap; }
+  thead th{ background:#DDE3EC !important; color:#111 !important; }
+  a{ color:#111; text-decoration:underline; }
+}
+
+/* --- 20. 모션 축소 선호 -------------------------------------------------- */
+@media (prefers-reduced-motion:reduce){
+  html{ scroll-behavior:auto; }
+  *{ animation:none !important; transition:none !important; }
+}
+</style>
+</head>
+<body data-track="custom">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-tags">
+      <button type="button" class="sb-fab" id="sbFab" aria-expanded="true" aria-controls="courseSidebar" aria-label="전체 코스 목록 열기/닫기">
+        <span class="sb-fab-bar" aria-hidden="true"></span>
+      </button>
+      <span class="tag tag-product">Claude</span>
+      <span class="tag tag-custom">중급 custom</span>
+      <span class="tag tag-muted">모듈 01</span>
+    </div>
+    <nav class="topbar-nav" aria-label="문서 이동">
+      <a class="navlink navlink-step" href="claude_basic_05_artifacts.html">이전: 초급 05 아티팩트</a>
+      <a class="navlink navlink-step" href="claude_custom_02_skills.html">다음: 02 스킬로 응답 방식과 반복 작업 저장하기</a>
+      <a class="navlink" href="index.html">로드맵</a>
+      <a class="navlink" href="glossary.html">용어집</a>
+    </nav>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="courseSidebar" aria-label="전체 코스 목록">
+    <p class="sidebar-title">전체 코스</p>
+    <div id="sidebarNav"></div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<div class="page">
+
+  <div class="doc-header">
+    <p class="eyebrow">Claude · 중급 · 모듈 01</p>
+    <h1>계정 전체 지침으로 <span class="hl">반복 설명 없애기</span></h1>
+    <p class="lede">매 대화마다 "나는 어떤 일을 하고, 이렇게 답해 달라"를 다시 적고 있다면 그것을 한 번만 설정하면 됩니다. 지침을 적용하기 전과 후의 응답을 직접 비교해 효과를 확인합니다.</p>
+  </div>
+
+  <h2>1. 모듈 정보</h2>
+
+  <dl class="meta">
+    <dt>제품</dt><dd>Claude</dd>
+    <dt>트랙</dt><dd>중급 (custom)</dd>
+    <dt>번호 · 제목</dt><dd>01 · 계정 전체 지침으로 반복 설명 없애기</dd>
+    <dt>예상 소요 시간</dt><dd>30분 (읽기 10분 + 실습 20분)</dd>
+    <dt>확인 기준일</dt><dd>2026-08-26</dd>
+    <dt>기준 요금제</dt><dd><strong>Pro 또는 Max.</strong> 이 커리큘럼의 Claude 중급 코스는 Pro·Max를 기준으로 합니다. 계정 전체 지침 기능 자체는 공식 요금제 비교표에 별도 제한이 표시되어 있지 않습니다 <span class="src">(출처: claude.com/pricing, 2026-08-26 확인)</span>. Team·Enterprise 계정도 동일하게 진행되지만, 조직 지침이 배포된 경우 그것이 함께 적용됩니다(4-5) — 이는 이번 확인에서 Team 계정으로 직접 재현했습니다.</dd>
+    <dt>기준 버전</dt><dd>claude.ai 웹 인터페이스 기준. 특정 모델명·버전은 이 모듈에서 다루지 않습니다.</dd>
+  </dl>
+
+  <h2>2. 학습 목표</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+    <p>이 모듈을 마치면 다음을 할 수 있습니다.</p>
+    <ol>
+      <li>계정 전체 지침을 설정하고 모든 대화에 적용되는 것을 직접 확인할 수 있다.</li>
+      <li>지침에 무엇을 적어야 하는지 네 가지 관점으로 판단할 수 있다.</li>
+      <li>계정 지침·프로젝트 지침·스킬 중 어느 것을 쓸지 고를 수 있다.</li>
+    </ol>
+  </div>
+
+  <h2>3. 사전 준비</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+
+    <h3>3-1. 준비물</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>항목</th><th>내용</th></tr></thead>
+        <tbody>
+          <tr><th>필요 플랜</th><td>Pro 또는 Max.</td></tr>
+          <tr><th>설치</th><td>불필요. 웹 브라우저만 있으면 됩니다.</td></tr>
+          <tr><th>사전 지식</th><td><strong>Claude 초급 5개 모듈 전부 수료.</strong> 특히 <a href="claude_basic_01_first-chat.html">초급 01</a>의 프롬프트 3요소를 지침 작성에 그대로 씁니다.</td></tr>
+          <tr><th>준비물</th><td>1단계와 6단계의 응답을 비교할 <strong>메모장</strong>. 두 응답을 나란히 붙여 두면 차이가 잘 보입니다.</td></tr>
+          <tr><th>예상 사용량</th><td>프롬프트 4회. 짧은 문서 작성 요청이라 사용량이 적습니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>3-2. 이 문서의 화면 표기 방식</h3>
+    <p>초급과 같습니다. 화면 속 <strong>위치</strong>를 기준으로 설명하고, 한국어 표기가 공식 문서로 확인된 경우에만 따옴표로 인용합니다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>이 문서에서 부르는 이름</th><th>확인 상태</th></tr></thead>
+        <tbody>
+          <tr><td>왼쪽 아래 이니셜</td><td>확인됨 <span class="src">(출처: support.claude.com/en/articles/10185728, 2026-08-26 확인 — 라이브 화면에서도 재확인)</span></td></tr>
+          <tr><td>"설정"</td><td>확인됨 <span class="src">(출처: support.claude.com/en/articles/10185728, 2026-08-26 확인 — 라이브 화면의 드롭다운 메뉴에 동일하게 표시됨)</span></td></tr>
+          <tr><td>계정 전체 지침 입력란<br><small>영문 원표기: <code>Instructions for Claude</code></small></td><td>확인됨 — 한국어 라벨은 <strong>"Claude 지침"</strong> <span class="src">(2026-08-26, claude.ai 설정 화면에서 직접 확인)</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>3-3. 이 모듈은 계정 설정을 바꿉니다</h3>
+    <div class="callout callout-warn">
+      <span class="callout-title">모든 대화에 적용됩니다</span>
+      <p>여기서 설정하는 지침은 <strong>이 계정의 모든 대화</strong>에 적용됩니다. 실습이 끝난 뒤에도 그대로 두어도 괜찮은 내용만 넣으세요. 되돌리려면 같은 화면에서 지우면 됩니다.</p>
+      <p><strong>이미 지침을 쓰고 있다면</strong> 실습 전에 그 내용을 메모장에 복사해 두세요. 실습 후 원래대로 되돌릴 수 있습니다.</p>
+    </div>
+  </div>
+
+  <h2>4. 핵심 개념</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+
+    <h3>4-1. 결론부터</h3>
+    <p><strong>매번 다시 설명하고 있는 것이 있다면, 그건 지침에 적을 것입니다.</strong> 초급에서는 프롬프트 하나하나에 맥락을 적었습니다. 중급의 첫걸음은 <strong>매번 같은 맥락을 한 번만 적어 두는 것</strong>입니다.</p>
+
+    <h3>4-2. 개인화 수단은 세 가지입니다</h3>
+    <p>공식 문서는 개인화 방법을 셋으로 정리합니다. <span class="src">(출처: support.claude.com/en/articles/10185728, 2026-08-26 확인)</span></p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>수단</th><th>적용 범위</th><th>언제 로드되는가</th><th>이 커리큘럼에서</th></tr></thead>
+        <tbody>
+          <tr><th><strong>계정 전체 지침</strong></th><td>내 모든 대화(Cowork 작업 포함)</td><td>항상</td><td><strong>이 모듈</strong></td></tr>
+          <tr><th>프로젝트 지침</th><td>그 프로젝트 안 대화만</td><td>그 프로젝트에서 항상</td><td>모듈 03</td></tr>
+          <tr><th>스킬(Skills)</th><td>Claude 전체</td><td>관련 있을 때만 동적으로</td><td>모듈 02</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="code-caption">설정 화면의 지침 입력란 위에는 "채팅 및 Cowork 전반에 걸쳐 이 내용을 기억합니다"라는 설명이 붙어 있어, 계정 전체 지침이 Cowork 작업에도 적용됨을 확인할 수 있습니다. <span class="src">(2026-08-26, claude.ai 설정 화면에서 직접 확인)</span></p>
+    <div class="callout callout-info">
+      <span class="callout-title">"스타일(Styles)"을 찾고 있다면</span>
+      <p>예전 자료에는 응답 어조를 바꾸는 <strong>Styles</strong>가 나옵니다. 현재 공식 개인화 문서에는 Styles가 별도로 등장하지 않으며, 어조·형식을 조정하고 내 글쓰기나 선호에 맞춘 소통 방식을 적용하는 기능은 <strong>스킬(Skills)</strong> 설명에 포함되어 있습니다. <span class="src">(출처: support.claude.com/en/articles/10185728, 2026-08-26 확인)</span> 설정 화면에서도 별도의 Styles 항목은 보이지 않고, "기능" 탭 하단에는 "스킬이 Customize로 이동했습니다"라는 안내만 있습니다 <span class="src">(2026-08-26, claude.ai 설정 화면에서 직접 확인)</span>. 이 커리큘럼은 모듈 02에서 스킬로 다룹니다.</p>
+    </div>
+
+    <h3>4-3. 무엇을 적는가 — 네 가지 관점</h3>
+    <p>공식 문서가 제시하는 네 가지입니다. <span class="src">(출처: support.claude.com/en/articles/10185728, 2026-08-26 확인)</span></p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>관점</th><th>무엇을 적는가</th><th>예</th></tr></thead>
+        <tbody>
+          <tr><th>선호하는 접근법·방법</th><td>일할 때 늘 따르는 방식</td><td>"결론을 첫 줄에 먼저 쓴다"</td></tr>
+          <tr><th>자주 쓰는 용어·개념</th><td>내 분야에서 특정한 뜻으로 쓰는 말</td><td>"초안은 검토 전 문서, 확정본은 승인이 끝난 문서"</td></tr>
+          <tr><th>자주 마주치는 상황</th><td>반복되는 업무 맥락</td><td>"읽는 사람은 대부분 해당 분야 비전문가"</td></tr>
+          <tr><th>일반적인 소통 방식</th><td>어조·분량·형식의 기본값</td><td>"목록은 5개 이하로"</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout callout-tip">
+      <span class="callout-title">초급 01의 3요소가 그대로 쓰입니다</span>
+      <p>초급 01에서 배운 <strong>과제·맥락·출력 형식</strong> 중, <strong>맥락과 출력 형식은 매번 같습니다.</strong> 그래서 지침으로 옮길 수 있습니다. 매번 달라지는 것은 과제뿐이고, 그것만 프롬프트에 적으면 됩니다.</p>
+    </div>
+
+    <h3>4-4. 지침이 길수록 좋은 것은 아닙니다</h3>
+    <p>계정 지침은 <strong>모든 대화에 실립니다.</strong> 길수록 매 대화의 컨텍스트를 더 차지하고, 관계없는 대화에까지 영향을 줍니다. 특정 작업에만 필요한 규칙은 지침이 아니라 프로젝트나 스킬로 보내야 합니다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>이런 내용이면</th><th>어디에</th></tr></thead>
+        <tbody>
+          <tr><td>내가 하는 일과 늘 지키는 소통 방식</td><td>계정 지침 (이 모듈)</td></tr>
+          <tr><td>특정 업무의 배경 자료와 그 업무만의 규칙</td><td>프로젝트 (모듈 03)</td></tr>
+          <tr><td>여러 단계로 이뤄진 반복 절차</td><td>스킬 (모듈 02)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>4-5. 지침에 넣으면 안 되는 것</h3>
+    <div class="callout callout-danger">
+      <span class="callout-title">민감 정보를 적지 마세요</span>
+      <p>계정 지침은 <strong>모든 대화에 자동으로 실리는 텍스트</strong>입니다. 고객명, 계정 정보, 자격 증명, 대외비 프로젝트명 같은 것을 여기 적으면 <strong>의도치 않은 대화에도 그대로 들어갑니다.</strong> 대화를 공유하거나 캡처할 때도 함께 노출됩니다.</p>
+      <p>지침에는 <strong>업무 방식</strong>을 적고, <strong>업무 내용</strong>은 그때그때 프롬프트나 프로젝트에 넣으세요.</p>
+    </div>
+    <p class="code-caption">Team·Enterprise 계정이라면 관리자가 배포한 <strong>조직 지침</strong>이 내 지침과 함께 적용될 수 있습니다. 충돌하는 부분은 조직 지침이 우선하고, 조직 지침이 다루지 않는 부분은 내 지침이 그대로 적용됩니다. 조직 지침의 설정과 배포는 Admin·Owner 이상의 관리자 권한이 필요해 상급 트랙에서 다룹니다. <span class="src">(출처: support.claude.com/en/articles/14546867, 2026-08-26 확인)</span></p>
+  </div>
+
+  <h2>5. 단계별 실습</h2>
+
+  <div class="section practice">
+    <span class="section-kind">실습</span>
+
+    <p><strong>만들 결과물:</strong> 적용 효과를 직접 확인한 계정 전체 지침 1건과, 전·후 응답 비교 기록.</p>
+
+    <ol class="steps">
+
+      <li>
+        <span class="step-title">지침 적용 전 대조군을 만듭니다</span>
+        <p>새 대화를 열고 <a href="#prompt-a">프롬프트 A</a>를 그대로 보냅니다. <strong>응답 전체를 메모장에 복사해 두세요.</strong> 6단계에서 같은 질문을 다시 하고 비교합니다.</p>
+        <div class="callout callout-warn">
+          <span class="callout-title">이 단계를 건너뛰지 마세요</span>
+          <p>비교 대상이 없으면 지침이 실제로 효과가 있었는지 확인할 방법이 없습니다. 이 모듈에서 가장 중요한 단계입니다.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">설정 화면을 엽니다</span>
+        <p>왼쪽 아래 <strong>이니셜</strong>을 클릭하고 <span class="ui">"설정"</span>을 선택합니다. 초급 01에서 사용량을 확인할 때 들어갔던 그 화면입니다.</p>
+      </li>
+
+      <li>
+        <span class="step-title">계정 전체 지침 입력란을 찾습니다</span>
+        <p>설정을 열면 기본으로 <span class="ui">"일반"</span> 탭이 열리고, 그 안에 <strong>"Claude 지침"</strong>이라는 제목의 입력란이 바로 보입니다(영문 원표기: <code>Instructions for Claude</code>). 별도로 다른 탭을 찾을 필요가 없습니다. 입력란 위에는 이 내용을 <strong>채팅과 Cowork 전반에서 기억한다</strong>는 설명이 붙어 있습니다.</p>
+
+        <div class="capture">
+          <div class="capture-head">[캡처 C-01]</div>
+          <dl>
+            <dt>화면</dt><dd>설정 &gt; 일반 탭의 "Claude 지침" 입력란</dd>
+            <dt>진입 경로</dt><dd>왼쪽 아래 이니셜 → <span class="ui">"설정"</span> (기본값으로 "일반" 탭이 열림) → "Claude 지침" 입력란</dd>
+            <dt>캡처 범위</dt><dd>입력란과 그 위의 설명 문구가 함께 보이는 범위</dd>
+            <dt>강조 표시</dt><dd>입력란 라벨(빨간 테두리)</dd>
+            <dt>캡션</dt><dd>"Claude 지침" 입력란. 여기 적은 내용은 이 계정의 모든 대화와 Cowork 작업에 적용된다.</dd>
+          </dl>
+          <p class="code-caption" style="padding:0 14px 10px;">이 캡처로 3-2 표의 한국어 라벨을 <strong>"Claude 지침"</strong>으로 확정했습니다(2026-08-26 라이브 확인).</p>
+        </div>
+        <figure>
+          <img src="images/claude_custom_01_C-01.png" alt="Claude 설정 화면 일반 탭의 'Claude 지침' 입력란. 제목과 그 위의 설명 문구(Anthropic의 가이드라인 내에서 채팅 및 Cowork 전반에 걸쳐 이 내용을 기억한다는 안내)는 선명하게 보이며, 아래 입력란에 이미 저장돼 있던 실제 지침 내용 부분만 흐림 처리되어 있다.">
+          <figcaption>[C-01] "Claude 지침" 입력란 (2026-08-26 라이브 캡처). 입력란 안의 내용은 이 계정에 이미 저장돼 있던 실제 지침이라 개인정보 보호를 위해 흐림 처리했습니다 — 학습자 본인 화면에서는 이 부분이 비어 있거나 본인이 쓴 내용으로 보입니다.</figcaption>
+        </figure>
+      </li>
+
+      <li>
+        <span class="step-title">지침을 입력합니다</span>
+        <p><a href="#text-instructions">6번 절의 지침 전문</a>을 복사해 입력란에 붙여 넣습니다. 네 가지 관점(4-3)이 모두 들어 있는 예시입니다.</p>
+        <p>본인 업무에 맞게 고쳐도 됩니다. 다만 <strong>4-5의 민감 정보 금지</strong>는 반드시 지키세요.</p>
+        <div class="callout callout-info">
+          <span class="callout-title">별도의 "저장" 버튼이 없습니다</span>
+          <p>이 입력란 주변에는 <span class="ui">"저장"</span> 버튼이 보이지 않습니다(2026-08-26 라이브 확인). 정확히 언제·어떻게 자동으로 반영되는지는 공식 문서에 나와 있지 않아 <span class="unverified">공식 자료 미확인</span>입니다. 입력을 마쳤으면 <strong>설정 창을 닫았다가 다시 열어</strong> 내용이 그대로 남아 있는지 직접 확인하세요.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">새 대화를 엽니다</span>
+        <p><strong>1단계에서 쓰던 대화를 이어 쓰지 말고 새 대화를 여세요.</strong> 같은 대화를 이어 쓰면 그동안 쌓인 대화 맥락 때문에 응답이 달라져도 그것이 지침 때문인지 맥락 때문인지 구분할 수 없어, 비교 자체가 무의미해집니다.</p>
+        <p class="code-caption">지침이 <strong>새 대화부터만</strong> 적용되는지, 저장 즉시 기존 대화에도 적용되는지는 공식 문서에 명시돼 있지 않아 <span class="unverified">공식 자료 미확인</span>입니다. 다만 어느 쪽이든 <strong>새 대화를 쓰는 것이 더 안전한 비교 방법</strong>이므로, 이 실습에서는 항상 새 대화를 기준으로 합니다.</p>
+      </li>
+
+      <li>
+        <span class="step-title">같은 질문을 다시 합니다</span>
+        <p>1단계와 <strong>완전히 동일한</strong> <a href="#prompt-a">프롬프트 A</a>를 다시 보냅니다. 한 글자도 바꾸지 마세요. 프롬프트가 같아야 차이가 지침 때문이라고 말할 수 있습니다.</p>
+
+        <div class="capture">
+          <div class="capture-head">[캡처 C-02]</div>
+          <dl>
+            <dt>화면</dt><dd>지침 적용 후 응답</dd>
+            <dt>진입 경로</dt><dd>지침 저장 후 새 대화에서 프롬프트 A 전송</dd>
+            <dt>캡처 범위</dt><dd>응답 앞부분(첫 줄과 목록이 보이는 범위)</dd>
+            <dt>강조 표시</dt><dd>결론이 먼저 나온 첫 줄(빨간 테두리)</dd>
+            <dt>캡션</dt><dd>같은 프롬프트인데 응답 구조가 달라졌다. 지침이 적용된 결과다.</dd>
+          </dl>
+        </div>
+        <!-- SCREENSHOT: C-02 지침 적용 후 응답 — 실촬영 대신 HTML/CSS 목업으로 대체(사유: §9 필요 캡처 목록 참고) -->
+        <figure class="mockup-figure">
+          <div class="mockup-head">[목업 C-02]</div>
+          <div class="mockup-screen">
+            <div class="mkchat">
+              <div class="mkchat-user-row">
+                <div class="mkchat-bubble">(사용자) 프롬프트 A — 1단계와 동일한 문장을 그대로 재전송</div>
+              </div>
+              <div class="mkchat-assistant-row">
+                <span class="mkchat-avatar" aria-hidden="true"></span>
+                <div class="mkchat-body">
+                  <p class="mkchat-lead">여기에 결론이 먼저 오는 응답 첫 줄이 표시됩니다</p>
+                  <ul class="mkchat-list">
+                    <li>이어지는 근거·세부 항목이 목록으로 표시됩니다</li>
+                    <li>이어지는 근거·세부 항목이 목록으로 표시됩니다</li>
+                    <li>이어지는 근거·세부 항목이 목록으로 표시됩니다</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <p class="mockup-caption">[C-02] 같은 프롬프트인데 응답 구조가 달라졌다 — 지침이 적용된 결과를 근사한 목업입니다.</p>
+            <p class="mockup-note"><b>실제 화면과 다를 수 있는 근사 목업입니다.</b> 이 계정에는 이미 저장된 실사용 지침이 있어, 이 화면을 실제로 찍으려면 그 지침을 6번 절 예시 문구로 덮어써야 합니다 — 계정 소유자 승인 없이는 할 수 없는 일이라 실촬영 대신 목업으로 대체했습니다. 학습자 본인 계정에서는 5~6단계를 그대로 따라 하면 이 화면을 직접 만들 수 있습니다.</p>
+          </figcaption>
+        </figure>
+      </li>
+
+      <li>
+        <span class="step-title">두 응답을 비교합니다</span>
+        <p>메모장의 1단계 응답과 방금 받은 응답을 나란히 놓고 확인합니다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>확인 항목</th><th>지침 전</th><th>지침 후</th></tr></thead>
+            <tbody>
+              <tr><td>첫 줄이 결론인가</td><td>대개 아님</td><td>결론이어야 함</td></tr>
+              <tr><td>목록 항목 수</td><td>정해지지 않음</td><td>5개 이하여야 함</td></tr>
+              <tr><td>불확실한 내용 표기</td><td>없음</td><td>"확인 필요" 표시가 있어야 함</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="checkpoint">
+          <span class="checkpoint-title">여기까지 — 지침 적용 확인</span>
+          <ul>
+            <li>같은 프롬프트로 <strong>전·후 응답 두 개</strong>를 확보했다</li>
+            <li>지침 후 응답의 첫 줄이 결론이다</li>
+            <li>목록이 5개 이하로 줄었다</li>
+          </ul>
+          <p>차이가 없다면 ① 새 대화가 아닌 기존 대화에서 물었거나 ② 지침이 저장되지 않았을 수 있습니다. 7번 절을 확인하고 5단계부터 다시 하세요.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">과한 부분을 덜어냅니다 (프롬프트 B)</span>
+        <p>지침은 짧을수록 좋습니다(4-4). Claude에게 직접 점검을 맡깁니다.</p>
+        <div class="code-label">프롬프트</div>
+<pre><code>제 계정 지침을 점검해 주세요.
+
+아래 기준으로 나눠 주세요.
+1. 모든 대화에 필요한 것 — 계정 지침에 남길 것
+2. 특정 업무에만 필요한 것 — 프로젝트나 스킬로 옮길 것
+3. 민감 정보이거나 불필요한 것 — 지울 것
+
+지침 내용은 아래와 같습니다.
+(4단계에서 저장한 지침을 여기 붙여 넣으세요)</code></pre>
+        <p>2번으로 분류된 항목이 있으면 지침에서 빼 두었다가 모듈 02·03에서 제자리를 찾아 넣습니다.</p>
+      </li>
+
+      <li>
+        <span class="step-title">세 수단 중 무엇을 쓸지 판단해 봅니다 (프롬프트 C)</span>
+        <p>4-4의 판단 기준을 내 업무에 적용해 봅니다. 이 응답이 모듈 02·03의 실습 재료가 됩니다.</p>
+        <div class="code-label">프롬프트</div>
+<pre><code>제가 Claude에게 반복적으로 맡기는 일이 아래와 같습니다.
+(본인 업무 3~4가지를 적으세요)
+
+각각을 계정 지침 / 프로젝트 / 스킬 중 어디에 두는 것이 좋을지
+판단해 주고, 그 이유를 한 줄씩 적어 주세요.</code></pre>
+        <p>응답을 메모해 두세요. <strong>모듈 02에서 스킬로, 모듈 03에서 프로젝트로 만들 후보 목록</strong>이 됩니다.</p>
+      </li>
+
+    </ol>
+  </div>
+
+  <h2>6. 예제 코드·예제 프롬프트</h2>
+
+  <div class="section practice">
+    <span class="section-kind">실습 자료</span>
+
+    <h3 id="text-instructions">예제 — 계정 전체 지침 전문</h3>
+    <p><strong>사전 준비물:</strong> 설정 화면의 계정 전체 지침 입력란. 기존 지침이 있으면 메모장에 백업.</p>
+    <div class="code-label">그대로 복사해 붙여 넣으세요 — 발췌가 아닌 전문입니다</div>
+<pre><code>[내 상황]
+- 사내 업무 문서를 자주 작성합니다.
+- 읽는 사람은 대부분 해당 분야 비전문가입니다.
+
+[자주 쓰는 용어]
+- "초안"은 검토 전 문서, "확정본"은 승인이 끝난 문서를 뜻합니다.
+
+[답변 방식]
+- 결론을 첫 줄에 먼저 쓰세요.
+- 목록은 5개 이하로 유지하세요.
+- 확실하지 않은 내용은 "확인 필요"로 표시하고 추측으로 채우지 마세요.</code></pre>
+    <p><strong>네 가지 관점이 이렇게 대응합니다:</strong></p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>관점 (4-3)</th><th>위 지침의 어느 줄</th></tr></thead>
+        <tbody>
+          <tr><td>자주 마주치는 상황</td><td>[내 상황] 두 줄</td></tr>
+          <tr><td>자주 쓰는 용어·개념</td><td>[자주 쓰는 용어]</td></tr>
+          <tr><td>선호하는 접근법·방법</td><td>"결론을 첫 줄에 먼저"</td></tr>
+          <tr><td>일반적인 소통 방식</td><td>"목록은 5개 이하", "확인 필요 표시"</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>예상 출력:</strong> 저장만 하므로 출력이 없습니다.</p>
+    <p><strong>성공 확인 방법:</strong> 저장 후 <strong>새 대화</strong>를 열어 프롬프트 A를 보냈을 때 응답의 첫 줄이 결론이면 성공입니다.</p>
+    <div class="callout callout-danger">
+      <span class="callout-title">고객명·계정 정보를 넣지 마세요</span>
+      <p>4-5에서 본 대로 이 텍스트는 모든 대화에 자동으로 실립니다. 위 예시에 <strong>업무 내용이 아니라 업무 방식만</strong> 적혀 있는 것을 확인하세요.</p>
+    </div>
+
+    <div class="callout callout-info">
+      <span class="callout-title">응답은 매번 다릅니다</span>
+      <p>아래 "예상 출력"은 <strong>응답 예시</strong>입니다. 성공 여부는 문구가 아니라 <strong>응답의 구조가 지침대로 바뀌었는지</strong>로 판단합니다.</p>
+    </div>
+
+    <h3 id="prompt-a">프롬프트 A — 전·후 비교용 대조 질문</h3>
+    <p><strong>사전 준비물:</strong> 1단계에서는 지침 없는 새 대화, 6단계에서는 지침 저장 후의 새 대화. <strong>두 번 모두 같은 문장을 씁니다.</strong></p>
+    <div class="code-label">실행할 프롬프트 전문</div>
+<pre><code>사내 회의실 예약 규칙이 자주 바뀌어서 직원들이 헷갈려 합니다.
+전 직원에게 보낼 안내문 초안을 써 주세요.</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> 지침 전에는 배경 설명부터 시작해 항목이 여럿인 안내문이 나오는 경우가 많습니다. 지침 후에는 결론이 첫 줄에 오고, 목록이 5개 이하로 정리되며, 규칙 내용 중 알 수 없는 부분이 "확인 필요"로 표시됩니다.</p>
+    <p><strong>성공 확인 방법:</strong> 아래 3가지를 <strong>두 응답을 비교해</strong> 확인합니다.</p>
+    <ul class="checklist">
+      <li><input type="checkbox" id="b1"><label for="b1">지침 후 응답의 <strong>첫 줄이 결론</strong>이다</label></li>
+      <li><input type="checkbox" id="b2"><label for="b2">지침 후 응답의 <strong>목록이 5개 이하</strong>다</label></li>
+      <li><input type="checkbox" id="b3"><label for="b3">지침 후 응답에 <strong>"확인 필요"</strong> 표시가 있다 (실제 규칙을 알려 주지 않았으므로)</label></li>
+    </ul>
+    <p class="code-caption">세 번째 항목이 특히 중요합니다. 회의실 규칙의 실제 내용을 알려 주지 않았는데도 그럴듯하게 지어냈다면, 지침이 적용되지 않았거나 지침 문구가 약한 것입니다.</p>
+
+    <h3 id="prompt-b">프롬프트 B — 지침 점검</h3>
+    <p><strong>사전 준비물:</strong> 4단계에서 저장한 지침 내용.</p>
+    <div class="code-label">실행할 프롬프트 전문 (마지막 줄에 지침을 붙여 넣으세요)</div>
+<pre><code>제 계정 지침을 점검해 주세요.
+
+아래 기준으로 나눠 주세요.
+1. 모든 대화에 필요한 것 — 계정 지침에 남길 것
+2. 특정 업무에만 필요한 것 — 프로젝트나 스킬로 옮길 것
+3. 민감 정보이거나 불필요한 것 — 지울 것
+
+지침 내용은 아래와 같습니다.
+(4단계에서 저장한 지침을 여기 붙여 넣으세요)</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> 세 분류로 나뉜 목록이 나옵니다. 예시 지침을 그대로 썼다면 대부분 1번으로 분류되는 것이 정상입니다.</p>
+    <p><strong>성공 확인 방법:</strong> 세 분류가 모두 제시되면 성공입니다(해당 없는 분류는 "없음"). 본인 지침으로 바꿔 썼다면 <strong>2번 분류에 들어간 항목을 메모</strong>해 두세요.</p>
+
+    <h3 id="prompt-c">프롬프트 C — 어디에 둘지 판단</h3>
+    <p><strong>사전 준비물:</strong> 본인이 Claude에게 반복적으로 맡기는 일 3~4가지.</p>
+    <div class="code-label">실행할 프롬프트 전문 (괄호 부분을 본인 업무로 채우세요)</div>
+<pre><code>제가 Claude에게 반복적으로 맡기는 일이 아래와 같습니다.
+(본인 업무 3~4가지를 적으세요)
+
+각각을 계정 지침 / 프로젝트 / 스킬 중 어디에 두는 것이 좋을지
+판단해 주고, 그 이유를 한 줄씩 적어 주세요.</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> 업무마다 셋 중 하나가 배정되고 이유가 붙습니다.</p>
+    <p><strong>성공 확인 방법:</strong> 업무마다 배정과 이유가 모두 나왔으면 성공입니다. <strong>이 응답을 저장해 두세요</strong> — 모듈 02(스킬)와 모듈 03(프로젝트)의 실습 재료가 됩니다.</p>
+  </div>
+
+  <h2>7. 트러블슈팅</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>증상</th><th>원인</th><th>해결</th></tr></thead>
+        <tbody>
+          <tr>
+            <th>지침을 저장했는데 응답이 그대로다</th>
+            <td>기존 대화에서 물어봤거나, 입력 후 저장(반영)이 실제로 안 됐음</td>
+            <td>새 대화를 열고 다시 확인하세요(5단계) — 같은 대화를 이어 쓰면 맥락이 섞여 비교가 정확하지 않습니다. 그래도 그대로라면 설정을 닫았다가 다시 열어 지침이 남아 있는지 확인하세요.</td>
+          </tr>
+          <tr>
+            <th>설정에서 지침 입력란을 못 찾겠다</th>
+            <td>화면 언어나 레이아웃 차이</td>
+            <td>설정을 열면 기본으로 열리는 <span class="ui">"일반"</span> 탭에서 <strong>"Claude 지침"</strong>이라는 제목의 입력란을 찾습니다. 프로젝트 안에서 여는 지침 입력란과 <strong>다른 화면</strong>이니 주의하세요.</td>
+          </tr>
+          <tr>
+            <th>지침 일부만 반영된다</th>
+            <td>지시가 모호하거나 서로 충돌함</td>
+            <td>검증 가능하게 고쳐 씁니다. "간결하게"가 아니라 "목록은 5개 이하로"처럼 <strong>숫자와 형식</strong>으로 적으세요.</td>
+          </tr>
+          <tr>
+            <th>관계없는 대화에까지 지침이 끼어든다</th>
+            <td>특정 업무용 규칙을 계정 지침에 넣음</td>
+            <td>8단계의 점검을 실행해 2번으로 분류된 항목을 지침에서 빼고, 모듈 02·03에서 제자리에 넣습니다.</td>
+          </tr>
+          <tr>
+            <th>Team·Enterprise인데 내 지침과 다른 규칙이 적용된다</th>
+            <td>관리자가 배포한 조직 지침이 함께 적용됨</td>
+            <td>정상 동작입니다. 조직 지침은 관리자만 바꿀 수 있습니다. 충돌이 업무에 지장을 주면 관리자에게 문의하세요.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>7-2. 흔한 잘못된 습관</h3>
+    <p>오류가 나지 않아 위 표로는 잡히지 않지만, 그대로 두면 지침이 오히려 방해가 되는 경우입니다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>습관</th><th>겉으로 나타나는 모습</th><th>대응</th></tr></thead>
+        <tbody>
+          <tr>
+            <th>지침을 계속 덧붙이기만 한다</th>
+            <td>처음엔 좋아지다가, 어느 순간부터 지시가 서로 부딪혀 무엇이 먹는지 알 수 없어짐</td>
+            <td>추가할 때마다 <strong>뺄 것도 함께 찾습니다.</strong> 8단계의 점검을 주기적으로 돌리세요.</td>
+          </tr>
+          <tr>
+            <th>특정 업무 규칙을 계정 지침에 넣는다</th>
+            <td>그 업무는 편해지지만, 관계없는 대화에서 엉뚱한 형식이 나옴</td>
+            <td>4-4의 표로 판단합니다. 업무별 규칙은 프로젝트, 반복 절차는 스킬입니다.</td>
+          </tr>
+          <tr>
+            <th>설정하고 효과를 확인하지 않는다</th>
+            <td>적었으니 됐다고 생각하지만, 실제로는 모호해서 무시되는 중</td>
+            <td>전·후 비교(1·6·7단계)를 한 세트로 굳힙니다. 이 모듈의 실습 구조가 그 훈련입니다.</td>
+          </tr>
+          <tr>
+            <th>업무 내용을 지침에 적는다</th>
+            <td>매번 안 적어도 되어 편함. 대화를 공유하거나 캡처할 때 그대로 노출됨</td>
+            <td>지침에는 <strong>업무 방식</strong>만, 업무 내용은 프로젝트에 둡니다(4-5).</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>8. 확인 체크리스트</h2>
+
+  <div class="section">
+    <span class="section-kind">자가 점검</span>
+    <p>모듈 02로 넘어가기 전에 스스로 확인하세요.</p>
+    <ul class="checklist">
+      <li><input type="checkbox" id="c1"><label for="c1">계정 지침을 설정하고 <strong>전·후 응답을 직접 비교</strong>해 효과를 확인했다.</label></li>
+      <li><input type="checkbox" id="c2"><label for="c2">전·후 비교는 반드시 새 대화에서 해야 정확하다는 점을 안다.</label></li>
+      <li><input type="checkbox" id="c3"><label for="c3">네 가지 관점(접근법·용어·상황·소통 방식)을 보지 않고 말할 수 있다.</label></li>
+      <li><input type="checkbox" id="c4"><label for="c4">계정 지침·프로젝트·스킬 중 무엇을 쓸지 판단 기준을 말할 수 있다.</label></li>
+      <li><input type="checkbox" id="c5"><label for="c5">지침에 업무 내용이나 민감 정보를 넣지 않았음을 확인했다.</label></li>
+    </ul>
+  </div>
+
+  <h2>9. 필요 캡처 목록</h2>
+
+  <div class="section">
+    <span class="section-kind">작성자용</span>
+    <p>이 모듈에는 캡처 2장이 필요합니다. C-01은 2026-08-26 라이브 확인 과정에서 실제 화면으로 교체했습니다. C-02는 계정에 이미 저장된 실사용 지침을 보존하기 위해 실촬영 대신 HTML/CSS 목업으로 대체했습니다(사유는 아래 콜아웃 참고).</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>번호</th><th>화면</th><th>진입 경로</th><th>캡처 범위</th><th>강조 표시</th><th>캡션</th><th>상태</th></tr></thead>
+        <tbody>
+          <tr><td class="mod-no">C-01</td><td>설정 &gt; 일반 탭의 "Claude 지침" 입력란</td><td>왼쪽 아래 이니셜 → <span class="ui">"설정"</span> → "Claude 지침" 입력란</td><td>입력란과 위의 설명 문구</td><td>입력란 라벨</td><td>"Claude 지침" 입력란. 여기 적은 내용은 이 계정의 모든 대화와 Cowork 작업에 적용된다.</td><td><span class="status status-done">완료</span></td></tr>
+          <tr><td class="mod-no">C-02</td><td>지침 적용 후 응답</td><td>지침 저장 후 새 대화에서 프롬프트 A 전송</td><td>응답 앞부분(첫 줄과 목록)</td><td>결론이 먼저 나온 첫 줄</td><td>같은 프롬프트인데 응답 구조가 달라졌다.</td><td><span class="status status-mockup">목업 대체</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout callout-warn">
+      <span class="callout-title">C-02를 실촬영 대신 목업으로 대체한 이유</span>
+      <p>C-02는 <strong>이 계정에 실제로 새 지침을 저장한 뒤</strong>라야 찍을 수 있는 화면입니다. 이 계정에는 이미 실사용 중인 지침이 저장돼 있어, 확인 작업 중에 그 내용을 6번 절의 예시로 덮어쓰면 실제 사용자의 설정을 훼손하게 됩니다. 계정 설정을 바꾸는 작업은 계정 소유자의 명시적 승인 없이는 진행하지 않아, 이 자리에는 HTML/CSS로 근사 재현한 목업을 대신 넣었습니다(실제 화면과 다를 수 있음, §7-3 참고). <strong>학습자 본인 계정</strong>에서 5~6단계를 그대로 따라 하면 이 화면을 직접 만들 수 있고, 계정 소유자가 승인하면 이 목업을 실제 캡처로 교체할 예정입니다.</p>
+    </div>
+  </div>
+
+  <h2>10. 참고 자료</h2>
+
+  <ul class="reflist">
+    <li>Understanding Claude's personalization features (Anthropic Help Center) — <code>https://support.claude.com/en/articles/10185728-understanding-claude-s-personalization-features</code> <span class="ref-date">2026-08-26 확인</span></li>
+    <li>Set organization instructions (Anthropic Help Center) — <code>https://support.claude.com/en/articles/14546867-set-organization-instructions</code> <span class="ref-date">2026-08-26 확인</span></li>
+    <li>Plans &amp; Pricing (Claude by Anthropic) — <code>https://claude.com/pricing</code> <span class="ref-date">2026-08-26 확인</span></li>
+    <li>claude.ai 실제 화면 라이브 확인 — Settings의 "일반"·"기능" 탭, "Claude 지침" 입력란, 계정 전환 드롭다운(Team/개인) <span class="ref-date">2026-08-26 확인</span></li>
+  </ul>
+
+  <div class="callout callout-info">
+    <span class="callout-title">사실 확인 기준</span>
+    <p>계정 전체 지침의 진입 경로와 적용 범위, 무엇을 적을지에 대한 네 가지 관점, 계정 지침·프로젝트 지침·스킬의 역할 구분을 공식 개인화 문서로 확인했습니다. 조직 지침이 Team·Enterprise의 Admin·Owner 이상 전용이라는 점, 개인 지침과 함께 적용되며 충돌 시 조직 지침이 우선한다는 점은 조직 지침 문서로 확인했습니다. <strong>한국어 화면의 지침 입력란 라벨</strong>은 2026-08-26 Team 계정 라이브 확인으로 <strong>"Claude 지침"</strong>임을 확정했고, 같은 확인에서 Team 계정에도 이 입력란이 동일하게 나타나는 것과 별도의 "저장" 버튼이 없다는 것도 직접 확인했습니다. 다만 저장이 정확히 언제·어떤 방식으로 반영되는지, 지침이 기존 대화에도 즉시 적용되는지는 공식 문서와 라이브 확인 모두로 확정하지 못해 <span class="unverified">공식 자료 미확인</span>으로 남겼습니다(5단계 참고). 이 계정에 실사용 중인 지침이 이미 저장돼 있어, C-02(지침 적용 후 응답) 캡처처럼 <strong>실제 저장이 필요한 화면</strong>은 계정 소유자 승인 없이 만들지 않고 HTML/CSS 목업으로 대체했습니다.</p>
+  </div>
+
+  <div class="doc-footer">
+    <span>Claude · 중급 · 모듈 01 (claude_custom_01_instructions.html)</span>
+    <span class="checked-date">최종 확인일: 2026-08-26</span>
+  </div>
+
+</div>
+</div><!-- /.layout -->
+
+<script>
+(function(){
+  var COURSES = [{"id":"claude-basic","product":"Claude","track":"basic","trackLabel":"초급","status":"done","modules":[{"no":"01","file":"claude_basic_01_first-chat.html","title":"접속과 첫 대화, 프롬프트 기초"},{"no":"02","file":"claude_basic_02_interface-and-chats.html","title":"화면 구성과 대화 관리"},{"no":"03","file":"claude_basic_03_file-upload.html","title":"파일 업로드로 문서 질의하기"},{"no":"04","file":"claude_basic_04_model-and-effort.html","title":"모델 선택과 응답 조절"},{"no":"05","file":"claude_basic_05_artifacts.html","title":"아티팩트로 결과물 만들고 내보내기"}]},{"id":"cowork-basic","product":"Claude Cowork","track":"basic","trackLabel":"초급","status":"todo","modules":[]},{"id":"code-basic","product":"Claude Code","track":"basic","trackLabel":"초급","status":"done","modules":[{"no":"01","file":"code_basic_01_install-and-first-session.html","title":"설치와 첫 세션"},{"no":"02","file":"code_basic_02_permissions-and-safety.html","title":"권한 모드와 안전장치"},{"no":"03","file":"code_basic_03_first-change-and-commit.html","title":"첫 코드 변경과 커밋"},{"no":"04","file":"code_basic_04_claude-md.html","title":"CLAUDE.md로 프로젝트 컨텍스트 남기기"},{"no":"05","file":"code_basic_05_project-structure.html","title":"Claude Code 폴더 구조 총정리"}]},{"id":"design-basic","product":"Claude Design","track":"basic","trackLabel":"초급","status":"todo","modules":[]},{"id":"claude-custom","product":"Claude","track":"custom","trackLabel":"중급","status":"done","modules":[{"no":"01","file":"claude_custom_01_instructions.html","title":"계정 전체 지침으로 반복 설명 없애기"},{"no":"02","file":"claude_custom_02_skills.html","title":"스킬(Skills)로 응답 방식과 반복 작업 저장하기"},{"no":"03","file":"claude_custom_03_projects.html","title":"프로젝트로 작업 공간 꾸리기"},{"no":"04","file":"claude_custom_04_connectors.html","title":"커넥터로 외부 도구 연결하기"},{"no":"05","file":"claude_custom_05_memory.html","title":"메모리와 이전 대화 활용하기"}]},{"id":"cowork-custom","product":"Claude Cowork","track":"custom","trackLabel":"중급","status":"todo","modules":[]},{"id":"code-custom","product":"Claude Code","track":"custom","trackLabel":"중급","status":"done","modules":[{"no":"01","file":"code_custom_01_codebase-recon.html","title":"기존 코드베이스 파악하기"},{"no":"02","file":"code_custom_02_settings-json.html","title":"settings.json으로 반복 승인 정리하기"},{"no":"03","file":"code_custom_03_skills.html","title":"스킬(Skills)로 반복 작업 저장하기"},{"no":"04","file":"code_custom_04_review-workflow.html","title":"코드 리뷰 워크플로 만들기"},{"no":"05","file":"code_custom_05_mcp.html","title":"MCP로 외부 도구 연결하기"}]},{"id":"design-custom","product":"Claude Design","track":"custom","trackLabel":"중급","status":"todo","modules":[]},{"id":"claude-advanced","product":"Claude","track":"advanced","trackLabel":"상급","status":"done","modules":[{"no":"01","file":"claude_advanced_01_structured-prompts.html","title":"구조화된 프롬프트 설계"},{"no":"02","file":"claude_advanced_02_examples-and-thinking.html","title":"예시와 사고 유도로 일관성 높이기"},{"no":"03","file":"claude_advanced_03_prompt-assets.html","title":"프롬프트를 재사용 자산으로 만들기"},{"no":"04","file":"claude_advanced_04_org-rollout.html","title":"조직 표준 배포 설계"}]},{"id":"cowork-advanced","product":"Claude Cowork","track":"advanced","trackLabel":"상급","status":"todo","modules":[]},{"id":"code-advanced","product":"Claude Code","track":"advanced","trackLabel":"상급","status":"done","modules":[{"no":"01","file":"code_advanced_01_hooks-guard.html","title":"훅으로 위험 경로 차단하기"},{"no":"02","file":"code_advanced_02_safety-net.html","title":"변경 안전망 — 현재 동작 박제와 자동 검증"},{"no":"03","file":"code_advanced_03_subagents.html","title":"서브에이전트로 컨텍스트와 권한 분리하기"},{"no":"04","file":"code_advanced_04_handover-system.html","title":"세션 인계 체계 운용하기"},{"no":"05","file":"code_advanced_05_automation-rollout.html","title":"무인 실행과 조직 표준 배포"}]},{"id":"design-advanced","product":"Claude Design","track":"advanced","trackLabel":"상급","status":"todo","modules":[]}];
+
+  var STATUS_LABEL = {done:'완료', writing:'작성 중', planned:'분할 확정', todo:'미착수'};
+  var currentFile = location.pathname.split('/').pop() || 'index.html';
+
+  var nav = document.getElementById('sidebarNav');
+  if(!nav) return;
+
+  /* 코스 아코디언 펼침 상태: 페이지를 이동해도 "지금 보는 모듈의 코스"를
+     자동으로 펼치지 않는다 — 오직 사용자가 직접 펼치거나 접은 이력만
+     기억한다. 아무 것도 편 적이 없으면 전부 접힌 채로 시작한다. */
+  var OPEN_STORAGE_KEY = 'curriculum-sidebar-open-courses';
+
+  function readOpenCourseIds(){
+    try{
+      var raw = window.localStorage.getItem(OPEN_STORAGE_KEY);
+      if(!raw) return [];
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    }catch(e){ return []; }
+  }
+  function writeOpenCourseIds(ids){
+    try{ window.localStorage.setItem(OPEN_STORAGE_KEY, JSON.stringify(ids)); }catch(e){}
+  }
+
+  var openCourseIds = readOpenCourseIds();
+
+  var html = '';
+  COURSES.forEach(function(course){
+    var isOpen = openCourseIds.indexOf(course.id) !== -1;
+    html += '<div class="sb-course' + (isOpen ? ' open' : '') + '" data-course="' + course.id + '">';
+    html += '<button type="button" class="sb-course-btn" data-status="' + course.status + '" aria-expanded="' + isOpen + '">';
+    html += '<span class="sb-caret" aria-hidden="true"></span>';
+    html += '<span class="sb-dot" title="' + (STATUS_LABEL[course.status]||course.status) + '"></span>';
+    html += '<span class="sb-course-name">' + course.product + ' · ' + course.trackLabel + '</span>';
+    html += '</button>';
+    if(course.modules.length){
+      html += '<ul class="sb-modules">';
+      course.modules.forEach(function(m){
+        var isCurrent = (m.file === currentFile);
+        html += '<li><a href="' + m.file + '"' + (isCurrent ? ' class="current" aria-current="page"' : '') + '>';
+        html += '<span class="sb-no">' + m.no + '</span>' + m.title;
+        html += '</a></li>';
+      });
+      html += '</ul>';
+    } else {
+      html += '<ul class="sb-modules"><li class="sb-empty">아직 모듈 없음</li></ul>';
+    }
+    html += '</div>';
+  });
+  nav.innerHTML = html;
+
+  nav.addEventListener('click', function(e){
+    var btn = e.target.closest('.sb-course-btn');
+    if(!btn) return;
+    var courseEl = btn.closest('.sb-course');
+    var courseId = courseEl.getAttribute('data-course');
+    var willOpen = !courseEl.classList.contains('open');
+    courseEl.classList.toggle('open', willOpen);
+    btn.setAttribute('aria-expanded', String(willOpen));
+
+    var ids = readOpenCourseIds();
+    var idx = ids.indexOf(courseId);
+    if(willOpen && idx === -1) ids.push(courseId);
+    if(!willOpen && idx !== -1) ids.splice(idx, 1);
+    writeOpenCourseIds(ids);
+  });
+
+  /* 현재 모듈이 속한 코스가 (사용자 조작으로) 이미 펼쳐져 있는 경우에만
+     사이드바 내부를 스크롤해 보여준다 — 접혀 있으면 건드리지 않는다. */
+  var currentLink = nav.querySelector('a.current');
+  var sidebarEl = document.getElementById('courseSidebar');
+  if(currentLink && sidebarEl && currentLink.closest('.sb-course.open')){
+    var linkTop = currentLink.offsetTop;
+    var linkBottom = linkTop + currentLink.offsetHeight;
+    var viewTop = sidebarEl.scrollTop;
+    var viewBottom = viewTop + sidebarEl.clientHeight;
+    if(linkTop < viewTop || linkBottom > viewBottom){
+      sidebarEl.scrollTop = Math.max(0, linkTop - sidebarEl.clientHeight / 2);
+    }
+  }
+
+  /* --- topbar 왼쪽 햄버거 버튼 하나로 사이드바 표시를 제어.
+     데스크톱(960px 초과): 기본 표시, 버튼 클릭 시 숨김(폭 반환).
+     모바일(960px 이하): 기본 숨김(오버레이), 버튼 클릭 시 오버레이로 표시.
+     "다음/이전 모듈"로 페이지를 이동해도 직전에 선택한 표시 상태가
+     이어지도록 localStorage에 저장한다(파일마다 독립 실행되는 정적
+     페이지라 이 값 없이는 이동할 때마다 항상 기본 상태로 되돌아간다). */
+  var VISIBLE_STORAGE_KEY = 'curriculum-sidebar-visible';
+  var fab = document.getElementById('sbFab');
+  var backdrop = document.getElementById('sidebarBackdrop');
+  var mq = window.matchMedia('(max-width:960px)');
+
+  /* 모바일 topbar는 화면 폭에 따라 2~3줄로 접힐 수 있다. 고정 px 값 대신
+     실제 높이를 CSS 변수로 넘겨 사이드바 첫 항목이 topbar 뒤에 가려지지 않게 한다. */
+  function syncTopbarHeight(){
+    var topbar = document.querySelector('.topbar');
+    if(!topbar) return;
+    var h = Math.ceil(topbar.getBoundingClientRect().height);
+    document.documentElement.style.setProperty('--curriculum-topbar-height', h + 'px');
+  }
+
+  function readStoredVisible(){
+    try{
+      var v = window.localStorage.getItem(VISIBLE_STORAGE_KEY);
+      return v === null ? null : v === '1';
+    }catch(e){ return null; } /* 저장소 접근 불가 환경(파일 직접 열람 등) 대비 */
+  }
+  function writeStoredVisible(visible){
+    try{ window.localStorage.setItem(VISIBLE_STORAGE_KEY, visible ? '1' : '0'); }catch(e){}
+  }
+
+  function applyVisible(visible){
+    if(mq.matches){
+      document.body.classList.toggle('sidebar-open', visible);
+      document.body.classList.remove('sidebar-hidden');
+    } else {
+      document.body.classList.toggle('sidebar-hidden', !visible);
+      document.body.classList.remove('sidebar-open');
+    }
+    if(fab) fab.setAttribute('aria-expanded', String(visible));
+  }
+
+  syncTopbarHeight();
+  var stored = readStoredVisible();
+  var initialVisible = stored === null ? !mq.matches : stored;
+  applyVisible(initialVisible);
+
+  if(fab){
+    fab.addEventListener('click', function(){
+      var nowVisible = mq.matches
+        ? document.body.classList.contains('sidebar-open')
+        : !document.body.classList.contains('sidebar-hidden');
+      var next = !nowVisible;
+      applyVisible(next);
+      writeStoredVisible(next);
+    });
+  }
+  if(backdrop){
+    backdrop.addEventListener('click', function(){
+      applyVisible(false);
+      writeStoredVisible(false);
+    });
+  }
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && mq.matches && document.body.classList.contains('sidebar-open')){
+      applyVisible(false);
+      writeStoredVisible(false);
+    }
+  });
+  /* 데스크톱 <-> 모바일 경계를 넘나들며 화면 폭을 바꾸는 경우에도
+     저장된 선호에 맞춰 다시 계산 (모바일 오버레이 클래스와 데스크톱
+     폭-반환 클래스가 서로 섞이지 않도록) */
+  mq.addEventListener('change', function(){
+    syncTopbarHeight();
+    var v = readStoredVisible();
+    applyVisible(v === null ? !mq.matches : v);
+  });
+  window.addEventListener('resize', syncTopbarHeight);
+})();
+</script>
+
+</body>
+</html>

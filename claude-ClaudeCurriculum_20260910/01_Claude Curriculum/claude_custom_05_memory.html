@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude 중급 05 — 메모리와 이전 대화 활용하기</title>
+<style>
+/* ==========================================================================
+   Anthropic 제품 교육 커리큘럼 — 공용 스타일시트
+   버전: v1.1 / 확정일: 2026-08-19 (v1.1: 2026-08-20 .checkpoint 추가)
+   적용 대상: index.html, glossary.html, 모든 모듈 HTML 파일
+   원칙: 외부 CDN·웹폰트·이미지 참조 없음(오프라인 열람 가능)
+   사용법: 이 블록 전체를 각 파일의 <style> 안에 그대로 복사한다.
+          수정 시 기존 모든 파일에 동일하게 반영한다.
+   ========================================================================== */
+
+/* --- 1. 토큰 ------------------------------------------------------------ */
+:root{
+  --ink:#1B1F24;
+  --body:#3A3F46;
+  --muted:#6B7280;
+  --line:#E6E9EE;
+  --line-strong:#D2D9E3;
+  --bg:#FFFFFF;
+  --bg-soft:#F7F9FC;
+  --bg-practice:#F3F7FC;
+  --bg-code:#1E2430;
+
+  --blue:#2F6FCB;
+  --blue-dark:#255AA8;
+  --accent:#E2612B;
+
+  --track-basic:#2F6FCB;
+  --track-custom:#0E8A6B;
+  --track-advanced:#7A3E9D;
+  --track:var(--blue);          /* body[data-track]에서 덮어씀 */
+
+  --info:#2F6FCB;   --info-bg:#F0F5FC;
+  --tip:#0E8A6B;    --tip-bg:#EEF7F3;
+  --warn:#B76A08;   --warn-bg:#FDF6EA;
+  --danger:#C0392B; --danger-bg:#FDF1EF;
+
+  --st-todo:#6B7280;   --st-todo-bg:#F1F3F6;
+  --st-planned:#2F6FCB;--st-planned-bg:#EDF3FC;
+  --st-writing:#B76A08;--st-writing-bg:#FDF6EA;
+  --st-done:#0E8A6B;   --st-done-bg:#EAF6F1;
+  --st-mockup:#0E7C86; --st-mockup-bg:#E9F6F7;
+  --anno-red:#DC2626;
+
+  --radius:10px;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Apple SD Gothic Neo",
+         "Malgun Gothic","맑은 고딕","Noto Sans KR",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"D2Coding",
+         "Nanum Gothic Coding","Courier New",monospace;
+}
+
+/* 트랙별 강조색: <body data-track="basic|custom|advanced"> */
+body[data-track="basic"]   { --track:var(--track-basic); }
+body[data-track="custom"]  { --track:var(--track-custom); }
+body[data-track="advanced"]{ --track:var(--track-advanced); }
+
+/* --- 2. 기본 ------------------------------------------------------------ */
+*{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15.5px;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+.page{ max-width:940px; margin:0 auto; padding:0 24px 64px; }
+p{ margin:0 0 12px; color:var(--body); }
+a{ color:var(--blue-dark); }
+a:hover{ color:var(--accent); }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+hr{ border:0; border-top:1px solid var(--line); margin:28px 0; }
+small{ font-size:13px; color:var(--muted); }
+
+/* --- 3. 상단 내비게이션 -------------------------------------------------- */
+.topbar{
+  position:sticky; top:0; z-index:20;
+  background:rgba(255,255,255,.96);
+  border-bottom:1px solid var(--line);
+  backdrop-filter:saturate(180%) blur(6px);
+}
+.topbar-inner{
+  max-width:940px; margin:0 auto; padding:10px 24px;
+  display:flex; flex-wrap:nowrap; gap:10px 14px; align-items:center;
+  justify-content:flex-start; min-width:0;
+}
+.topbar-tags{
+  display:flex; flex:0 0 auto; flex-wrap:nowrap; gap:6px; align-items:center;
+}
+.topbar-nav{
+  display:flex; flex:1 1 auto; min-width:0; flex-wrap:nowrap; gap:6px; align-items:center;
+}
+.navlink{
+  display:inline-block; flex:0 0 auto; padding:5px 11px; border-radius:999px;
+  border:1px solid var(--line-strong); background:#fff;
+  font-size:13px; font-weight:600; color:var(--body); text-decoration:none;
+  white-space:nowrap;
+}
+/* 이전/다음만 남은 폭 안에서 줄어들며 제목을 말줄임표 처리한다. */
+.topbar-nav .navlink-step{
+  flex:0 1 auto; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.navlink:hover{ border-color:var(--track); color:var(--track); }
+.navlink.current{ background:var(--bg-soft); color:var(--muted); border-style:dashed; }
+.navlink.disabled{
+  color:#AEB4BD; border-color:var(--line); background:var(--bg-soft);
+  pointer-events:none; cursor:default;
+}
+
+/* --- 3b. 코스 사이드바 ---------------------------------------------------- */
+.layout{ display:flex; align-items:flex-start; width:100%; max-width:1180px; margin:0 auto; }
+.layout > .page{ flex:1 1 0; min-width:0; }
+.sidebar{
+  position:sticky; top:53px; flex:0 0 240px; width:240px;
+  max-height:calc(100vh - 53px); overflow-y:auto;
+  padding:18px 12px 40px 24px; box-sizing:border-box;
+  border-right:1px solid var(--line);
+  transition:margin-left .15s ease, opacity .15s ease;
+}
+.sidebar-title{
+  font-size:11px; font-weight:800; letter-spacing:.04em; color:var(--muted);
+  text-transform:uppercase; margin:0 0 10px; padding:0 4px;
+}
+.sb-course{ margin-bottom:2px; }
+.sb-course-btn{
+  display:flex; align-items:center; gap:7px; width:100%;
+  background:none; border:0; padding:7px 4px; cursor:pointer;
+  font-family:var(--sans); font-size:13.5px; font-weight:700; color:var(--ink);
+  text-align:left; border-radius:6px;
+}
+.sb-course-btn:hover{ background:var(--bg-soft); }
+.sb-course-btn .sb-caret{
+  display:inline-block; width:9px; height:9px; flex-shrink:0;
+  border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
+  transform:rotate(-45deg); transition:transform .15s ease;
+}
+.sb-course.open .sb-course-btn .sb-caret{ transform:rotate(45deg); }
+.sb-course-btn .sb-dot{
+  width:6px; height:6px; border-radius:50%; flex-shrink:0; background:var(--st-todo);
+}
+.sb-course-btn[data-status="done"] .sb-dot{ background:var(--st-done); }
+.sb-course-btn[data-status="writing"] .sb-dot{ background:var(--st-writing); }
+.sb-course-btn[data-status="planned"] .sb-dot{ background:var(--st-planned); }
+.sb-course-btn .sb-course-name{ flex:1 1 auto; }
+.sb-modules{
+  list-style:none; margin:0 0 6px; padding:0 0 0 15px;
+  display:none; border-left:1px solid var(--line); margin-left:8px;
+}
+.sb-course.open .sb-modules{ display:block; }
+.sb-modules li{ margin:0; }
+.sb-modules a{
+  display:block; padding:5px 8px; margin:1px 0;
+  font-size:12.5px; line-height:1.5; color:var(--body); text-decoration:none;
+  border-radius:5px; border-left:2px solid transparent;
+}
+.sb-modules a:hover{ background:var(--bg-soft); color:var(--track); }
+.sb-modules a .sb-no{ color:var(--muted); font-weight:700; margin-right:5px; }
+.sb-modules a.current{
+  background:var(--bg-soft); color:var(--track); font-weight:700;
+  border-left-color:var(--track);
+}
+.sb-empty{ padding:5px 8px; font-size:12px; color:var(--muted); }
+.sidebar-backdrop{ display:none; }
+
+/* 상단 topbar 맨 왼쪽(제품 태그보다 앞) 햄버거 버튼 — topbar-inner의 일반 flex 아이템이라
+   topbar가 sticky이므로 스크롤해도 함께 고정되고, 사이드바 열림/닫힘과 무관하게 항상 같은 자리 */
+.sb-fab{
+  flex:0 0 auto; order:-1;
+  width:30px; height:30px; padding:0; border-radius:7px;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--line-strong); background:#fff; cursor:pointer;
+  position:relative; z-index:1;
+}
+.sb-fab:hover{ border-color:var(--track); }
+.sb-fab .sb-fab-bar{
+  display:block; width:14px; height:2px; background:var(--body); border-radius:1px;
+  position:relative;
+}
+.sb-fab .sb-fab-bar::before, .sb-fab .sb-fab-bar::after{
+  content:""; position:absolute; left:0; width:14px; height:2px;
+  background:var(--body); border-radius:1px;
+}
+.sb-fab .sb-fab-bar::before{ top:-4px; }
+.sb-fab .sb-fab-bar::after{ top:4px; }
+
+/* 데스크톱: 사이드바 숨김 시 폭을 반환(오버레이 아님) */
+body.sidebar-hidden .sidebar{
+  width:0; flex-basis:0; padding-left:0; padding-right:0; border-right:0;
+  overflow:hidden; opacity:0; margin-left:-1px;
+}
+
+@media (max-width:960px){
+  .layout{ display:block; }
+  .sidebar{
+    position:fixed; top:var(--curriculum-topbar-height, 53px); left:0; z-index:40;
+    height:calc(100vh - var(--curriculum-topbar-height, 53px)); max-height:none; width:280px;
+    background:#fff; border-right:1px solid var(--line-strong);
+    padding:16px 14px 40px 24px;
+    transform:translateX(-100%); transition:transform .2s ease;
+    box-shadow:2px 0 18px rgba(0,0,0,.12);
+    opacity:1; /* 데스크톱 전용 opacity 규칙 무효화 */
+  }
+  /* 모바일에서는 기본이 숨김 상태. sidebar-hidden이 아니라 sidebar-open일 때만 보임 */
+  body.sidebar-open .sidebar{ transform:translateX(0); }
+  body.sidebar-hidden .sidebar{ width:280px; flex-basis:auto; overflow:visible; margin-left:0; }
+  .sidebar-backdrop{
+    display:none; position:fixed; inset:0; z-index:30;
+    background:rgba(20,24,30,.35);
+  }
+  body.sidebar-open .sidebar-backdrop{ display:block; }
+
+  /* .topbar(z-index:20, §10 공용 CSS)는 기본적으로 사이드바(40)·백드롭(30)보다
+     쌓임 순서가 낮다 — 자식 .sb-fab에 아무리 높은 z-index를 줘도 부모의
+     스택 컨텍스트를 벗어날 수 없으므로, 사이드바가 열린 동안만 topbar
+     자체의 z-index를 둘 다보다 높여 햄버거 버튼이 항상 눌리게 한다.
+     (이걸 하지 않으면 모바일에서 사이드바를 열고 나면 버튼이 그 뒤에
+     가려져 다시 눌러 닫을 방법이 없어진다.) */
+  body.sidebar-open .topbar{ z-index:41; }
+}
+
+/* --- 4. 태그 / 배지 ------------------------------------------------------ */
+.tag{
+  display:inline-block; padding:3px 10px; border-radius:999px;
+  font-size:12px; font-weight:700; line-height:1.6; white-space:nowrap;
+  border:1px solid transparent;
+}
+.tag-product{ background:#EEF1F5; color:#333A44; border-color:#DDE2E9; }
+.tag-basic{ background:#EDF3FC; color:var(--track-basic); border-color:#CFE0F6; }
+.tag-custom{ background:#EAF6F1; color:var(--track-custom); border-color:#C8E7DC; }
+.tag-advanced{ background:#F4EDFA; color:var(--track-advanced); border-color:#E0CDEF; }
+.tag-beta{ background:#FDF6EA; color:var(--warn); border-color:#F3E0BC; }
+.tag-muted{ background:#F1F3F6; color:var(--muted); border-color:#E3E7EC; }
+
+.status{
+  display:inline-block; padding:3px 10px; border-radius:6px;
+  font-size:12px; font-weight:700; white-space:nowrap;
+}
+.status-todo{ background:var(--st-todo-bg); color:var(--st-todo); }
+.status-planned{ background:var(--st-planned-bg); color:var(--st-planned); }
+.status-writing{ background:var(--st-writing-bg); color:var(--st-writing); }
+.status-done{ background:var(--st-done-bg); color:var(--st-done); }
+.status-mockup{ background:var(--st-mockup-bg); color:var(--st-mockup); }
+
+.unverified{
+  display:inline-block; padding:2px 8px; border-radius:6px;
+  background:var(--warn-bg); color:var(--warn);
+  font-size:12px; font-weight:700; border:1px dashed #EBD3A8;
+}
+
+/* --- 5. 문서 머리말 ------------------------------------------------------ */
+.doc-header{ padding:32px 0 20px; border-bottom:3px solid var(--track); margin-bottom:28px; }
+.eyebrow{
+  font-size:12.5px; font-weight:700; letter-spacing:.06em;
+  color:var(--track); text-transform:uppercase; margin:0 0 6px;
+}
+h1{ font-size:27px; font-weight:800; letter-spacing:-.01em; margin:0 0 10px; line-height:1.4; }
+h1 .hl{ color:var(--accent); }
+.lede{ font-size:15.5px; color:var(--body); margin:0; max-width:70ch; }
+
+h2{
+  font-size:20px; font-weight:800; margin:36px 0 12px; padding-left:12px;
+  border-left:5px solid var(--track); line-height:1.5;
+}
+h3{ font-size:16.5px; font-weight:700; margin:22px 0 8px; }
+h4{ font-size:15px; font-weight:700; margin:16px 0 6px; color:var(--body); }
+
+/* --- 6. 모듈 정보(메타) -------------------------------------------------- */
+.meta{
+  display:grid; grid-template-columns:150px 1fr; gap:1px;
+  background:var(--line); border:1px solid var(--line);
+  border-radius:var(--radius); overflow:hidden; margin:0 0 24px;
+}
+.meta dt{ background:var(--bg-soft); padding:9px 14px; font-size:13.5px; font-weight:700; }
+.meta dd{ background:#fff; padding:9px 14px; margin:0; font-size:13.5px; color:var(--body); }
+
+/* --- 7. 섹션(설명 영역 / 실습 영역) -------------------------------------- */
+.section{
+  background:#fff; border:1px solid var(--line); border-radius:var(--radius);
+  padding:20px 22px; margin:0 0 20px;
+}
+.section.practice{
+  background:var(--bg-practice); border-color:#D9E4F2;
+  border-left:5px solid var(--track);
+}
+.section > :first-child{ margin-top:0; }
+.section > :last-child{ margin-bottom:0; }
+.section-kind{
+  display:inline-block; margin:0 0 10px; padding:2px 9px; border-radius:5px;
+  font-size:12px; font-weight:700; letter-spacing:.02em;
+  background:#EEF1F5; color:#4B535D;
+}
+.section.practice .section-kind{ background:var(--track); color:#fff; }
+
+/* --- 8. 목록 / 단계 ------------------------------------------------------ */
+ul,ol{ margin:0 0 12px; padding-left:22px; color:var(--body); }
+li{ margin:3px 0; }
+
+.steps{ list-style:none; counter-reset:step; padding:0; margin:14px 0; }
+.steps > li{
+  counter-increment:step; position:relative;
+  padding:0 0 16px 40px; margin:0;
+  border-left:2px solid var(--line-strong); margin-left:13px;
+}
+.steps > li:last-child{ border-left-color:transparent; padding-bottom:0; }
+.steps > li::before{
+  content:counter(step,decimal-leading-zero);
+  position:absolute; left:-14px; top:0;
+  width:27px; height:27px; border-radius:50%;
+  background:var(--track); color:#fff;
+  font-size:12px; font-weight:700; font-family:var(--mono);
+  display:flex; align-items:center; justify-content:center;
+}
+.step-title{ font-weight:700; color:var(--ink); display:block; margin-bottom:4px; }
+
+/* --- 8b. 구간 체크 (긴 실습의 중간 점검) -------------------------------- */
+.checkpoint{
+  border:1px dashed var(--track); border-left:5px solid var(--track);
+  border-radius:8px; background:var(--bg-soft);
+  padding:12px 16px; margin:16px 0 4px;
+}
+.checkpoint-title{
+  display:block; font-weight:700; font-size:13.5px;
+  color:var(--track); margin-bottom:6px; letter-spacing:.01em;
+}
+.checkpoint ul{ margin:0; padding-left:20px; }
+.checkpoint li{ font-size:14px; margin:2px 0; }
+.checkpoint p{ font-size:14px; margin:6px 0 0; }
+
+/* --- 9. 코드 블록 -------------------------------------------------------- */
+pre{
+  background:var(--bg-code); color:#E8EDF5;
+  border-radius:8px; padding:14px 16px; margin:10px 0 14px;
+  overflow-x:auto; line-height:1.65;
+}
+pre code{
+  font-family:var(--mono); font-size:13px;
+  background:none; color:inherit; padding:0; border:0; white-space:pre;
+}
+code{
+  font-family:var(--mono); font-size:.9em;
+  background:#EEF1F5; color:#243044;
+  padding:1px 5px; border-radius:4px; border:1px solid #E1E6EC;
+}
+.code-label{
+  display:inline-block; margin:12px 0 0; padding:3px 10px;
+  border-radius:6px 6px 0 0; background:#2B3444; color:#C9D4E3;
+  font-family:var(--mono); font-size:11.5px; font-weight:700;
+}
+.code-label + pre{ margin-top:0; border-top-left-radius:0; }
+.code-caption{ font-size:12.5px; color:var(--muted); margin:-8px 0 14px; }
+
+/* UI 명칭·메뉴 경로 표기 */
+.ui{ font-weight:700; color:var(--ink); }
+.path{ font-family:var(--mono); font-size:.92em; color:var(--blue-dark); }
+
+/* --- 10. 콜아웃(경고·주의 박스) ------------------------------------------ */
+.callout{
+  border:1px solid; border-left-width:5px; border-radius:8px;
+  padding:12px 16px; margin:14px 0;
+}
+.callout > :first-child{ margin-top:0; }
+.callout > :last-child{ margin-bottom:0; }
+.callout-title{ display:block; font-weight:700; font-size:14px; margin-bottom:4px; }
+.callout p, .callout li{ font-size:14.5px; }
+.callout-info{ background:var(--info-bg); border-color:#CFE0F6; border-left-color:var(--info); }
+.callout-info .callout-title{ color:var(--info); }
+.callout-tip{ background:var(--tip-bg); border-color:#C8E7DC; border-left-color:var(--tip); }
+.callout-tip .callout-title{ color:var(--tip); }
+.callout-warn{ background:var(--warn-bg); border-color:#F3E0BC; border-left-color:var(--warn); }
+.callout-warn .callout-title{ color:var(--warn); }
+.callout-danger{ background:var(--danger-bg); border-color:#F5CFC9; border-left-color:var(--danger); }
+.callout-danger .callout-title{ color:var(--danger); }
+
+/* --- 11. 체크리스트 ------------------------------------------------------ */
+.checklist{ list-style:none; padding:0; margin:12px 0; }
+.checklist li{
+  display:flex; gap:10px; align-items:flex-start;
+  padding:9px 13px; margin:0 0 7px;
+  background:#fff; border:1px solid var(--line); border-radius:8px;
+  font-size:14.5px; color:var(--body);
+}
+.checklist input[type="checkbox"]{
+  width:16px; height:16px; margin:5px 0 0; flex-shrink:0;
+  accent-color:var(--track); cursor:pointer;
+}
+.checklist label{ cursor:pointer; }
+
+/* --- 12. 표 -------------------------------------------------------------- */
+.table-wrap{ overflow-x:auto; margin:12px 0 18px; }
+table{
+  width:100%; border-collapse:collapse;
+  border:1px solid var(--line); border-radius:var(--radius);
+  overflow:hidden; font-size:14px;
+}
+thead th{
+  background:var(--blue); color:#fff; font-weight:700;
+  text-align:left; padding:9px 13px; white-space:nowrap;
+}
+tbody td, tbody th{
+  border-top:1px solid var(--line); padding:9px 13px;
+  color:var(--body); vertical-align:top; text-align:left;
+}
+tbody th{ font-weight:700; color:var(--ink); background:var(--bg-soft); }
+tbody tr:nth-child(even) td{ background:var(--bg-soft); }
+td code, th code{ white-space:nowrap; }
+
+/* --- 13. 캡처 지시서 / 자리표시 ------------------------------------------ */
+.capture{
+  border:1px solid var(--line-strong); border-radius:8px;
+  background:#fff; margin:14px 0; overflow:hidden;
+}
+.capture-head{
+  background:#2B3444; color:#fff; padding:7px 14px;
+  font-size:13px; font-weight:700; font-family:var(--mono);
+}
+.capture dl{
+  display:grid; grid-template-columns:96px 1fr; gap:0;
+  margin:0; padding:10px 14px; font-size:13.5px;
+}
+.capture dt{ font-weight:700; color:var(--ink); padding:3px 0; }
+.capture dd{ margin:0; padding:3px 0; color:var(--body); }
+
+.screenshot-placeholder{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:130px; padding:22px 18px; margin:12px 0 16px;
+  border:2px dashed var(--line-strong); border-radius:8px;
+  background:repeating-linear-gradient(45deg,#FAFBFD,#FAFBFD 10px,#F3F6FA 10px,#F3F6FA 20px);
+  text-align:center;
+}
+.screenshot-placeholder .ph-no{
+  font-family:var(--mono); font-size:12.5px; font-weight:700;
+  color:#fff; background:#2B3444; padding:2px 9px; border-radius:5px; margin-bottom:8px;
+}
+.screenshot-placeholder .ph-desc{ font-size:13.5px; color:var(--muted); margin:0; max-width:52ch; }
+figure{ margin:12px 0 16px; }
+figure img{ max-width:100%; height:auto; border:1px solid var(--line-strong); border-radius:8px; display:block; }
+figcaption{ font-size:13px; color:var(--muted); margin-top:6px; }
+
+/* --- 13b. 목업(실촬영 대체) — 캡처 불가 시 HTML/CSS 근사 재현 --------------
+   실제 화면을 촬영할 수 없을 때(계정 데이터 훼손·계정 설정 변경 등 학습자
+   동의 없이는 할 수 없는 경우, 또는 CLI·브라우저 재현) 쓰는 근사 재현
+   컴포넌트. .capture-head와 짝을 이루되 색·형태로 구분해 실제 캡처
+   (.screenshot-placeholder, <figure><img>)와 시각적으로 구별한다.
+   §7-3 참고, 실제 화면과 다를 수 있음.
+   - .mock-note, .tui*, .browser-mock*, .chip, .btn-* : 터미널·브라우저 UI 근사
+   - .mockup-figure, .mkchat-*, .mkmodal-*, .mkmemory-* : 채팅·모달 UI 근사
+   ========================================================================== */
+
+.mock-note{
+  display:block;
+  background:var(--warn-bg); border:1px dashed #EBD3A8; border-radius:8px;
+  padding:9px 13px; margin:12px 0; font-size:13px; color:#7A5716; line-height:1.65;
+}
+.mock-note b{ color:var(--warn); margin-right:4px; }
+.tui{
+  border-radius:8px; overflow:hidden; margin:10px 0 16px;
+  border:1px solid #11151D; box-shadow:0 1px 3px rgba(0,0,0,.15);
+}
+.tui-bar{
+  background:#2B3444; color:#9AA6B8; padding:7px 12px;
+  font-family:var(--mono); font-size:11px; font-weight:700;
+  display:flex; align-items:center; gap:7px;
+}
+.tui-bar .dot{ width:9px; height:9px; border-radius:50%; background:#4A5468; display:inline-block; }
+.tui-body{
+  background:var(--bg-code); color:#DCE3ED;
+  font-family:var(--mono); font-size:12.5px; line-height:1.7;
+  padding:14px 16px; white-space:pre-wrap; overflow-x:auto; margin:0; border:0;
+}
+.tui-body .dim{ color:#7C8797; }
+.tui-body .accent{ color:#7FB0F2; }
+.tui-body .warn{ color:#E8B85C; }
+.tui-body .good{ color:#7FCF9F; }
+.tui-body .danger{ color:#E5877A; }
+.tui-body .hl{
+  display:inline-block; outline:2px solid var(--accent); outline-offset:2px; border-radius:3px;
+}
+.browser-mock{
+  border-radius:8px; overflow:hidden; margin:10px 0 16px;
+  border:1px solid var(--line-strong); background:#fff;
+}
+.browser-bar{
+  background:#EEF1F5; border-bottom:1px solid var(--line-strong);
+  padding:8px 12px; display:flex; align-items:center; gap:8px;
+}
+.browser-bar .dot{ width:9px; height:9px; border-radius:50%; background:#D5DAE1; display:inline-block; }
+.browser-url{
+  flex:1; background:#fff; border:1px solid var(--line-strong); border-radius:999px;
+  padding:4px 12px; font-family:var(--mono); font-size:11.5px; color:var(--muted);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.browser-content{ padding:26px 28px; }
+.browser-content h4{ margin:0 0 6px; font-size:15.5px; color:var(--ink); }
+.browser-content p{ font-size:13.5px; }
+.chip{
+  display:inline-flex; align-items:center; gap:6px; padding:5px 11px;
+  border:1px solid var(--line-strong); border-radius:999px; font-size:12.5px;
+  color:var(--body); background:var(--bg-soft); margin:6px 0;
+}
+.btn-row{ display:flex; gap:10px; margin-top:16px; }
+.btn-mock{
+  padding:8px 16px; border-radius:7px; font-size:13.5px; font-weight:700;
+  border:1px solid var(--line-strong); background:#fff; color:var(--body);
+}
+.btn-mock.primary{ background:var(--track); color:#fff; border-color:var(--track); }
+.btn-mock.hl{ outline:2px solid var(--accent); outline-offset:2px; }
+
+.mockup-figure{
+  border:1px solid var(--line-strong); border-radius:8px;
+  background:#fff; margin:12px 0 16px; overflow:hidden;
+}
+.mockup-head{
+  background:var(--st-mockup); color:#fff; padding:7px 14px;
+  font-size:13px; font-weight:700; font-family:var(--mono);
+}
+.mockup-screen{
+  margin:14px; border:1px solid var(--line-strong); border-radius:8px;
+  background:#fff; overflow:hidden;
+}
+.mockup-figure figcaption{ padding:0 14px 14px; margin-top:0; }
+.mockup-caption{ font-size:13px; color:var(--body); margin:10px 0 8px; }
+.mockup-caption b{ color:var(--ink); }
+.mockup-note{
+  font-size:12.5px; color:var(--body); background:var(--st-mockup-bg);
+  border:1px solid #C6E7EA; border-radius:6px; padding:9px 11px; margin:0;
+}
+.mockup-note b{ color:var(--st-mockup); }
+
+/* claude.ai 대화 화면 근사 — 배색·구도만 근사, 실제 화면과 다를 수 있음 */
+.mkchat{ padding:20px 22px 22px; }
+.mkchat-user-row{ display:flex; justify-content:flex-end; margin:0 0 18px; }
+.mkchat-bubble{
+  max-width:74%; background:#F0EEE6; color:var(--ink);
+  border-radius:16px; padding:9px 15px; font-size:13.5px; line-height:1.5;
+}
+.mkchat-assistant-row{ display:flex; gap:11px; align-items:flex-start; }
+.mkchat-avatar{
+  flex:0 0 auto; width:22px; height:22px; margin-top:1px;
+  border-radius:7px; background:#D97757;
+}
+.mkchat-body{ flex:1 1 auto; min-width:0; }
+.mkchat-lead{
+  display:inline-block; font-weight:700; font-size:14px; color:var(--ink);
+  border:2px solid var(--anno-red); border-radius:6px;
+  padding:5px 10px; margin:0 0 10px; line-height:1.4;
+}
+.mkchat-list{ margin:0; padding-left:19px; }
+.mkchat-list li{ font-size:13.5px; color:var(--body); margin:4px 0; }
+
+/* claude.ai 모달/목록 화면 근사 — 배색·구도만 근사, 실제 화면과 다를 수 있음 */
+.mkmodal-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 20px; border-bottom:1px solid var(--line);
+  font-size:14.5px; font-weight:700; color:var(--ink);
+}
+.mkmodal-close{ font-size:16px; color:var(--muted); line-height:1; font-weight:400; }
+.mkmemory-list{ list-style:none; margin:0; padding:6px 20px 18px; }
+.mkmemory-list li{ padding:12px 0; border-top:1px solid var(--line); }
+.mkmemory-list li:first-child{ border-top:0; }
+.mkmemory-title{ display:block; font-size:13.5px; font-weight:700; color:var(--ink); margin-bottom:3px; }
+.mkmemory-list p{ margin:0; font-size:12.5px; color:var(--muted); }
+
+/* --- 14. 출처 / 참고 자료 ------------------------------------------------ */
+.src{ font-size:12.5px; color:var(--muted); }
+.reflist{ list-style:none; padding:0; margin:10px 0; }
+.reflist li{
+  padding:8px 0; border-bottom:1px dashed var(--line); font-size:13.5px; color:var(--body);
+}
+.reflist li:last-child{ border-bottom:0; }
+.reflist .ref-date{ color:var(--muted); font-size:12.5px; }
+
+/* --- 15. index.html 전용 ------------------------------------------------- */
+.progress{
+  display:flex; flex-wrap:wrap; gap:10px; margin:0 0 24px;
+}
+.progress-card{
+  flex:1 1 200px; border:1px solid var(--line); border-radius:var(--radius);
+  background:var(--bg-soft); padding:14px 16px;
+}
+.progress-card .pc-label{ font-size:12.5px; font-weight:700; color:var(--muted); display:block; }
+.progress-card .pc-value{ font-size:22px; font-weight:800; color:var(--ink); font-family:var(--mono); }
+.progress-card .pc-note{ font-size:12.5px; color:var(--muted); display:block; margin-top:2px; }
+
+.part{ margin:0 0 10px; }
+.course{
+  border:1px solid var(--line); border-left:5px solid var(--track);
+  border-radius:var(--radius); background:#fff; padding:16px 18px; margin:0 0 14px;
+}
+.course[data-track="basic"]{ --track:var(--track-basic); }
+.course[data-track="custom"]{ --track:var(--track-custom); }
+.course[data-track="advanced"]{ --track:var(--track-advanced); }
+.course-head{
+  display:flex; flex-wrap:wrap; gap:8px 12px;
+  align-items:center; justify-content:space-between; margin-bottom:8px;
+}
+.course-head h3{ margin:0; font-size:16.5px; }
+.course-id{ display:flex; flex-wrap:wrap; gap:7px; align-items:center; }
+.course-note{ font-size:13.5px; color:var(--muted); margin:0 0 10px; }
+.module-table{ font-size:13.5px; }
+.module-table .mod-no{ font-family:var(--mono); font-weight:700; white-space:nowrap; }
+.module-table .empty-row td{
+  text-align:center; color:var(--muted); font-size:13px;
+  background:var(--bg-soft); padding:14px;
+}
+
+/* --- 16. glossary.html 전용 --------------------------------------------- */
+.filter-bar{ margin:0 0 18px; }
+.filter-bar input{
+  width:100%; max-width:420px; padding:9px 13px;
+  border:1px solid var(--line-strong); border-radius:8px;
+  font-family:var(--sans); font-size:14.5px; color:var(--ink); background:#fff;
+}
+.filter-bar input:focus{ outline:2px solid var(--track); outline-offset:1px; }
+.filter-count{ font-size:13px; color:var(--muted); margin-left:10px; }
+.term-table td:first-child{ width:230px; }
+.term{ font-weight:700; color:var(--ink); display:block; }
+.term-en{ font-family:var(--mono); font-size:12.5px; color:var(--muted); display:block; }
+.term-row.is-hidden{ display:none; }
+.no-result{ padding:18px; text-align:center; color:var(--muted); font-size:14px; }
+
+/* --- 17. 푸터 ----------------------------------------------------------- */
+.doc-footer{
+  margin-top:40px; padding-top:16px; border-top:1px solid var(--line);
+  font-size:13px; color:var(--muted);
+  display:flex; flex-wrap:wrap; gap:6px 18px; justify-content:space-between;
+}
+.doc-footer .checked-date{ font-weight:700; color:var(--body); }
+
+/* --- 18. 반응형 --------------------------------------------------------- */
+@media (max-width:720px){
+  body{ font-size:15px; }
+  .page{ padding:0 16px 48px; }
+  .topbar-inner{
+    padding:9px 16px;
+    overflow-x:auto; overflow-y:hidden;
+    scrollbar-width:none; overscroll-behavior-x:contain;
+  }
+  .topbar-inner::-webkit-scrollbar{ display:none; }
+  .topbar-nav{ flex:0 0 auto; }
+  .topbar-nav .navlink-step{ max-width:180px; }
+  h1{ font-size:23px; }
+  h2{ font-size:18px; }
+  .meta{ grid-template-columns:1fr; }
+  .meta dt{ padding-bottom:2px; }
+  .capture dl{ grid-template-columns:1fr; }
+  .capture dt{ padding-bottom:0; }
+  .term-table td:first-child{ width:auto; }
+  .section{ padding:16px; }
+  .mkchat{ padding:16px; }
+  .mkchat-bubble{ max-width:86%; }
+  .mkmodal-head{ padding:14px 16px; }
+  .mkmemory-list{ padding:4px 16px 16px; }
+}
+
+/* --- 19. 인쇄 ----------------------------------------------------------- */
+@media print{
+  .topbar, .filter-bar, .sidebar, .sidebar-backdrop, .sb-fab{ display:none; }
+  body{ font-size:11pt; }
+  .page{ max-width:none; padding:0; }
+  .layout{ display:block; max-width:none; }
+  .section, .course, .callout, .capture, .checklist li, .mockup-figure, .tui, .browser-mock{
+    break-inside:avoid; page-break-inside:avoid;
+  }
+  pre{ background:#F2F4F7; color:#111; border:1px solid #CCC; white-space:pre-wrap; }
+  thead th{ background:#DDE3EC !important; color:#111 !important; }
+  a{ color:#111; text-decoration:underline; }
+}
+
+/* --- 20. 모션 축소 선호 -------------------------------------------------- */
+@media (prefers-reduced-motion:reduce){
+  html{ scroll-behavior:auto; }
+  *{ animation:none !important; transition:none !important; }
+}
+</style>
+</head>
+<body data-track="custom">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-tags">
+      <button type="button" class="sb-fab" id="sbFab" aria-expanded="true" aria-controls="courseSidebar" aria-label="전체 코스 목록 열기/닫기">
+        <span class="sb-fab-bar" aria-hidden="true"></span>
+      </button>
+      <span class="tag tag-product">Claude</span>
+      <span class="tag tag-custom">중급 custom</span>
+      <span class="tag tag-muted">모듈 05</span>
+    </div>
+    <nav class="topbar-nav" aria-label="문서 이동">
+      <a class="navlink navlink-step" href="claude_custom_04_connectors.html">이전: 04 커넥터</a>
+      <a class="navlink navlink-step" href="claude_advanced_01_structured-prompts.html">다음: 상급 01 구조화된 프롬프트 설계</a>
+      <a class="navlink" href="index.html">로드맵</a>
+      <a class="navlink" href="glossary.html">용어집</a>
+    </nav>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="courseSidebar" aria-label="전체 코스 목록">
+    <p class="sidebar-title">전체 코스</p>
+    <div id="sidebarNav"></div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<div class="page">
+
+  <div class="doc-header">
+    <p class="eyebrow">Claude · 중급 · 모듈 05</p>
+    <h1>메모리와 <span class="hl">이전 대화 활용하기</span></h1>
+    <p class="lede">모듈 01~04가 <strong>내가 미리 넣어 두는 맥락</strong>이었다면, 이번엔 <strong>Claude가 스스로 쌓는 맥락</strong>입니다. 무엇이 담겼는지 확인하고, 담기면 안 되는 것을 분리하는 방법을 다룹니다.</p>
+  </div>
+
+  <h2>1. 모듈 정보</h2>
+
+  <dl class="meta">
+    <dt>제품</dt><dd>Claude</dd>
+    <dt>트랙</dt><dd>중급 (custom)</dd>
+    <dt>번호 · 제목</dt><dd>05 · 메모리와 이전 대화 활용하기</dd>
+    <dt>예상 소요 시간</dt><dd>30분 (읽기 12분 + 실습 18분)</dd>
+    <dt>확인 기준일</dt><dd>2026-08-26</dd>
+    <dt>기준 요금제</dt><dd><strong>Pro 또는 Max.</strong> 두 기능의 요건이 <strong>서로 다릅니다</strong> — 메모리는 무료를 포함한 전 플랜, 이전 채팅 검색은 <strong>유료 전용</strong>입니다(4-2). Enterprise는 관리자가 조직 단위로 끌 수 있으며, 끄면 <strong>조직 전체 사용자의 메모리 데이터가 즉시 영구 삭제</strong>됩니다. <span class="src">(출처: support.claude.com/ko/articles/11817273, 2026-08-26 확인)</span></dd>
+    <dt>기준 버전</dt><dd>claude.ai 웹 기준. <strong>2026-08-26 현재 메모리 기능은 신규·레거시 두 환경이 계정마다 다르게 공존</strong>합니다 — 이 문서는 그 차이를 4-1에서 먼저 설명합니다. 3-3도 함께 읽으세요.</dd>
+  </dl>
+
+  <h2>2. 학습 목표</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+    <p>이 모듈을 마치면 다음을 할 수 있습니다.</p>
+    <ol>
+      <li>메모리와 이전 채팅 검색이 <strong>다른 기능</strong>임을 알고 각각을 켜고 끌 수 있다.</li>
+      <li>메모리에 무엇이 담겼는지 확인하고 대화로 고칠 수 있다.</li>
+      <li>기억되면 안 되는 대화를 시크릿 채팅으로 분리하고 <strong>그 한계</strong>를 설명할 수 있다.</li>
+    </ol>
+  </div>
+
+  <h2>3. 사전 준비</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+
+    <h3>3-1. 준비물</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>항목</th><th>내용</th></tr></thead>
+        <tbody>
+          <tr><th>필요 플랜</th><td>Pro 또는 Max.</td></tr>
+          <tr><th>사전 지식</th><td><a href="claude_custom_04_connectors.html">중급 04</a> 수료. <a href="claude_basic_02_interface-and-chats.html">초급 02</a>에서 익힌 <strong>익명 채팅</strong>(2026-08-26 현재 화면 표기는 <strong>"시크릿 채팅"</strong>으로 바뀌었습니다 — 4-5)을 이 모듈에서 목적을 갖고 씁니다.</td></tr>
+          <tr><th>준비물</th><td>이 계정으로 <strong>이전에 나눈 대화가 몇 개</strong> 있어야 합니다. 이 커리큘럼을 따라왔다면 충분합니다.</td></tr>
+          <tr><th>예상 사용량</th><td>프롬프트 5회. 짧은 대화라 사용량이 적습니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>3-2. 이 문서의 화면 표기 방식</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>이 문서에서 부르는 이름</th><th>확인 상태</th></tr></thead>
+        <tbody>
+          <tr><td>"설정"</td><td>확인됨 — 왼쪽 아래 이니셜 클릭 시 나오는 메뉴에 실제로 있음 <span class="src">(직접 확인, 2026-08-26)</span></td></tr>
+          <tr><td>유령 아이콘 / <strong>"시크릿 채팅"</strong><br><small>2026-08-20판에서는 "익명 채팅"으로 썼습니다. <strong>화면 표기가 바뀌었습니다</strong> — 4-5 참고</small></td><td>확인됨. 실제 화면 문구는 "시크릿 채팅"/"시크릿 모드입니다" <span class="src">(직접 확인, 2026-08-26)</span>. 단 지원 센터 문서는 이 글 기준 아직 "익명 채팅"으로 표기 <span class="src">(출처: support.claude.com/ko/articles/12260368, 2026-08-26 확인)</span></td></tr>
+          <tr><td>메모리 설정 화면<br><small>계정마다 위치가 다릅니다 — 아래 참고</small></td><td>확인됨. <strong>Free·Pro·Max</strong>(신규 환경): 왼쪽 설정 메뉴에 <code>"메모리"</code> 항목이 따로 있음. <strong>Team·Enterprise</strong>(레거시 환경, 이 계정 포함): <span class="ui">"설정"</span> → <span class="ui">"기능"</span> 안의 "메모리" 구획. <span class="src">(레거시 화면 직접 확인 2026-08-26; 신규 화면은 출처: support.claude.com/ko/articles/11817273, 2026-08-26 확인)</span></td></tr>
+          <tr><td>이전 채팅 검색 토글</td><td>확인됨 — 실제 한국어 라벨은 <code>"채팅 검색 및 참조"</code> <span class="src">(직접 확인, 2026-08-26)</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>3-3. 낡은 자료를 조심하세요 — 단, 계정마다 다릅니다</h3>
+    <div class="callout callout-danger">
+      <span class="callout-title">"메모리는 밤에 한 번 갱신된다"는 설명, 아직도 맞는 계정이 있습니다</span>
+      <p>인터넷에는 <strong>"메모리가 하루 한 번 요약으로 갱신되므로 오늘 말한 것은 내일부터 반영된다"</strong>는 설명이 많습니다. 이것은 <strong>레거시 환경(4-1)의 실제 동작</strong>입니다 — Team·Enterprise 계정은 지금도 <strong>24시간마다 갱신되는 대화 요약</strong> 방식을 씁니다. 반면 <strong>신규 환경(Free·Pro·Max, 마이그레이션 완료)</strong>은 <strong>Claude가 대화 중에 실시간으로 읽고 쓰는 개별 분류 항목들의 집합</strong>으로 바뀌었습니다. <span class="src">(출처: support.claude.com/ko/articles/11817273, 2026-08-26 확인)</span></p>
+      <p>즉 "낡은 설명"인지 아닌지는 <strong>내 계정이 어느 환경인지에 달려 있습니다.</strong> 실습 5단계에서 <strong>내 계정에서 실제로 언제 반영되는지</strong> 직접 확인합니다 — 신규 환경이면 같은 세션에서 바로, 레거시 환경이면 최대 24시간 뒤일 수 있습니다.</p>
+    </div>
+  </div>
+
+  <h2>4. 핵심 개념</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+
+    <h3>4-1. 결론부터</h3>
+    <p><strong>메모리는 내가 안 넣어도 쌓입니다. 그래서 중급의 다른 기능과 관리 방식이 반대입니다.</strong> 계정 지침·스킬·프로젝트는 <strong>무엇을 넣을지</strong>가 문제였지만, 메모리는 <strong>무엇이 이미 들어갔는지 확인하고 빼는 것</strong>이 일입니다.</p>
+
+    <div class="callout callout-warn">
+      <span class="callout-title">먼저 확인: 내 계정은 신규 환경인가요, 레거시 환경인가요?</span>
+      <p>Anthropic은 메모리 기능을 <strong>점진적으로 새 환경으로 옮기는 중</strong>입니다. <strong>Free·Pro·Max 플랜은 이미 신규 환경으로 전환됐고, Team·Enterprise 플랜은 당분간 레거시 환경에 남아 있습니다</strong>(관리자에게 추후 별도 안내 예정). 이 모듈의 화면·동작 설명은 <strong>두 환경을 구분해서</strong> 씁니다. <span class="src">(출처: support.claude.com/ko/articles/11817273, 2026-08-26 확인)</span></p>
+      <table style="margin-top:8px;">
+        <thead><tr><th></th><th>신규 환경</th><th>레거시 환경</th></tr></thead>
+        <tbody>
+          <tr><th>대상</th><td>Free · Pro · Max</td><td>Team · Enterprise (현재 이 문서의 캡처 계정 포함)</td></tr>
+          <tr><th>설정 위치</th><td><span class="ui">"설정"</span> → <span class="ui">"메모리"</span> (독립 메뉴)</td><td><span class="ui">"설정"</span> → <span class="ui">"기능"</span> 안의 "메모리" 구획</td></tr>
+          <tr><th>갱신 방식</th><td>대화 중 실시간, 개별 항목 단위</td><td>24시간마다 대화 전체를 요약·종합</td></tr>
+          <tr><th>보고 고치는 방법</th><td>설정 화면에 목록이 바로 표시됨</td><td><span class="ui">"메모리 보기 및 편집"</span> 버튼 → 모달 창</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:8px;">확인 방법: 설정 메뉴에 <strong>"메모리"가 독립 항목으로 보이면 신규</strong>, <strong>"기능" 탭 안에 있으면 레거시</strong>입니다(1단계).</p>
+    </div>
+
+    <h3>4-2. 두 기능은 별개입니다</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th>메모리</th><th>이전 채팅 검색</th></tr></thead>
+        <tbody>
+          <tr><th>하는 일</th><td>이전 대화의 맥락을 <strong>기억</strong>해 이어 줌</td><td>이전 대화를 <strong>찾아서</strong> 참조</td></tr>
+          <tr><th>요금제</th><td><strong>전 플랜</strong> (무료 포함)</td><td><strong>유료 전용</strong> (Pro·Max·Team·Enterprise)</td></tr>
+          <tr><th>동작 방식</th><td>신규 환경: 실시간 개별 항목<br>레거시 환경: 24시간마다 요약 종합 (4-1)</td><td>RAG로 검색하며 <strong>도구 호출로 표시</strong>됨. 실제 화면 라벨은 <code>"Relevant chats"</code>(영문) <span class="src">(직접 확인, 2026-08-26)</span></td></tr>
+          <tr><th>내가 할 일</th><td>무엇이 담겼는지 확인·정리</td><td>자연어로 물어보기</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="code-caption">이전 채팅 검색은 유료 플랜의 웹·Claude Desktop·Claude Mobile에서 제공되며, 계정에 배포되면 <strong>기본으로 켜져 있습니다.</strong> 검색이 일어나면 현재 대화에 <strong>도구 호출로 표시</strong>되므로 언제 검색했는지 눈으로 알 수 있습니다. <span class="src">(출처: support.claude.com/ko/articles/11817273, 2026-08-26 확인)</span></p>
+
+    <h3>4-3. 검색 범위에는 경계가 있습니다</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>범위</th><th>내용</th></tr></thead>
+        <tbody>
+          <tr><td>프로젝트 <strong>밖</strong>의 모든 대화</td><td>하나의 범위로 검색됨</td></tr>
+          <tr><td>개별 프로젝트 대화</td><td><strong>각 프로젝트 안으로 검색이 한정</strong>됨</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="code-caption">즉 <strong>프로젝트 A의 대화를 프로젝트 B에서 찾을 수 없습니다.</strong> 메모리도 마찬가지로 <strong>프로젝트마다 별도로 유지</strong>되며 프로젝트 밖 대화와 섞이지 않습니다. 모듈 03에서 "프로젝트 안이라도 대화끼리 맥락이 공유되지 않는다"고 했던 것과 함께 기억하세요. <span class="src">(출처: support.claude.com/ko/articles/11817273, 2026-08-26 확인; 및 en/articles/9519177, 2026-08-20 확인·재확인 안 됨)</span></p>
+
+    <h3>4-4. 무엇이 기억되는가</h3>
+    <p>Claude는 <strong>협업에 도움이 되는 업무 관련 맥락</strong>에 집중합니다 — 역할, 진행 중인 프로젝트, 전문 분야 같은 것들입니다. 이 내용은 메모리나 프로젝트 요약에 반영되어 <strong>내가 직접 볼 수 있습니다.</strong> <span class="src">(출처: support.claude.com/ko/articles/11817273, 2026-08-26 확인)</span></p>
+    <div class="callout callout-tip">
+      <span class="callout-title">보고 고칠 수 있다는 점이 핵심입니다</span>
+      <p>Anthropic 공식 발표는 이렇게 밝힙니다 — <strong>설정에서 Claude가 대화로부터 무엇을 기억하는지 정확히 볼 수 있고, Claude와 대화하며 언제든 갱신할 수 있습니다.</strong> 무엇에 집중하거나 무시하라고 말하는지에 따라 Claude가 참조하는 기억을 조정합니다. <span class="src">(출처: anthropic.com/news/memory, 2026-08-20 확인)</span></p>
+      <p>실습 2·6단계가 이 두 가지를 각각 다룹니다.</p>
+    </div>
+    <p><strong>대화를 지우면 메모리도 자동으로 지워지는지는 환경마다 다릅니다.</strong> 레거시 환경은 대화를 삭제하면 그 요약도 함께 제거되지만, <strong>신규 환경은 원본 대화를 지워도 이미 만들어진 메모리 항목이 자동으로 사라지지 않습니다</strong> — 지우려면 메모리 화면에서 그 항목을 <strong>따로 삭제</strong>해야 합니다. 즉 신규 환경에서는 메모리가 대화 기록과 <strong>분리된 채로 남을 수 있는 저장소</strong>입니다. <span class="src">(출처: support.claude.com/ko/articles/11817273, 2026-08-26 확인)</span></p>
+
+    <h3>4-5. "시크릿 채팅"의 한계를 정확히 알아야 합니다</h3>
+    <div class="callout callout-warn">
+      <span class="callout-title">이름이 바뀌었습니다 — "익명 채팅" → "시크릿 채팅"</span>
+      <p>초급 02는 이 기능을 <strong>"익명 채팅"</strong>으로 소개합니다. 그런데 2026-08-26 기준 실제 화면에는 <strong>"시크릿 채팅"</strong>(유령 아이콘 클릭 시 "🌟 시크릿 모드입니다")으로 표시됩니다 — 지원 센터 문서는 아직 옛 이름을 쓰고 있어 자료마다 표기가 다를 수 있습니다. <strong>같은 기능</strong>이니 초급 02에서 "익명 채팅"이라는 이름을 봤다면 이 모듈의 "시크릿 채팅"과 같은 것으로 이해하세요. <span class="src">(직접 확인, 2026-08-26; 지원 문서는 출처: support.claude.com/ko/articles/12260368, 2026-08-26 확인)</span></p>
+    </div>
+    <p>여기서는 이 기능을 <strong>목적을 갖고</strong> 씁니다. 프로젝트 밖에서 새 대화를 시작하면 화면 오른쪽 위에 <strong>유령 아이콘</strong>이 보이고, 클릭하면 시크릿 채팅이 켜집니다. 이 모드에서는 <strong>대화가 기억되지 않아 메모리에도 대화 기록에도 저장되지 않고</strong>, 나중에 이전 대화를 검색할 때도 <strong>시크릿 채팅에서는 정보를 가져오지 않습니다.</strong> 화면에도 "채팅 기록은 여전히 관리자에게 표시됩니다"라는 안내가 함께 뜹니다. <span class="src">(직접 확인 및 출처: support.claude.com/ko/articles/11817273, 2026-08-26 확인)</span></p>
+    <div class="callout callout-danger">
+      <span class="callout-title">"시크릿 = 아무 데도 안 남는다"가 아닙니다</span>
+      <p>공식 문서가 분명히 합니다 — <strong>Team·Enterprise 플랜 계정을 쓰는 경우 시크릿 채팅도 표준 데이터 내보내기에 포함되며, 기본값으로 최소 30일(또는 조직이 정한 더 긴 기간) 보관됩니다.</strong> <span class="src">(출처: support.claude.com/ko/articles/12260368 및 11817273, 2026-08-26 확인)</span></p>
+      <p>즉 시크릿 채팅은 <strong>Claude가 기억하지 않게 하는 기능</strong>이지 <strong>기록이 남지 않게 하는 기능이 아닙니다.</strong> 사내 계정에서 "시크릿이니까 괜찮다"고 판단하면 안 됩니다. <strong>애초에 넣지 말아야 할 정보는 시크릿 채팅에도 넣지 마세요.</strong></p>
+    </div>
+
+    <h3>4-6. 중급 5개 모듈의 정리</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>모듈</th><th>맥락을 넣는 주체</th><th>관리 방식</th></tr></thead>
+        <tbody>
+          <tr><td>01 계정 지침</td><td>나</td><td>무엇을 넣을지 고름</td></tr>
+          <tr><td>02 스킬</td><td>나</td><td>무엇을 넣을지 고름</td></tr>
+          <tr><td>03 프로젝트</td><td>나</td><td>무엇을 넣을지 고름</td></tr>
+          <tr><td>04 커넥터</td><td>나 (연결만)</td><td>무엇을 허용할지 고름</td></tr>
+          <tr><td><strong>05 메모리</strong></td><td><strong>Claude</strong></td><td><strong>무엇이 들어갔는지 확인하고 뺌</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>5. 단계별 실습</h2>
+
+  <div class="section practice">
+    <span class="section-kind">실습</span>
+
+    <p><strong>만들 결과물:</strong> 메모리 동작을 전·후로 확인한 기록과, 정리된 메모리 내용.</p>
+
+    <ol class="steps">
+
+      <li>
+        <span class="step-title">두 기능의 현재 상태를 확인합니다</span>
+        <p>왼쪽 아래 이니셜 → <span class="ui">"설정"</span>을 클릭합니다. 다음 <strong>메모리가 어디 있는지가 계정마다 다릅니다</strong>(4-1) — 왼쪽 메뉴에 <span class="ui">"메모리"</span>가 독립 항목으로 보이면 신규 환경이니 그곳을 클릭하고, 안 보이면 <span class="ui">"기능"</span>을 클릭해 레거시 환경의 "메모리" 구획을 찾습니다. 어느 쪽이든 두 가지가 따로 있어야 합니다(4-2) — <strong>메모리 생성</strong>과 <strong>이전 채팅 검색·참조</strong>.</p>
+
+        <div class="capture">
+          <div class="capture-head">[캡처 C-01]</div>
+          <dl>
+            <dt>화면</dt><dd>메모리 설정 — 레거시 환경 기준(<span class="ui">"설정"</span> → <span class="ui">"기능"</span> 안의 메모리 구획)</dd>
+            <dt>진입 경로</dt><dd>왼쪽 아래 이니셜 → <span class="ui">"설정"</span> → (신규: "메모리" / 레거시: "기능" 안의 메모리)</dd>
+            <dt>캡처 범위</dt><dd>두 토글이 함께 보이는 범위</dd>
+            <dt>강조 표시</dt><dd>이전 채팅 검색 토글(빨간 테두리)</dd>
+            <dt>캡션</dt><dd>메모리와 이전 채팅 검색은 별개 설정이다. 요금제 요건도 다르다.</dd>
+          </dl>
+          <p class="code-caption" style="padding:0 14px 10px;">이 캡처로 3-2 표를 확정했습니다. 신규 환경 화면은 이 계정(Team 플랜, 레거시 환경)에서는 재현할 수 없어 공식 문서 설명으로 대신합니다(4-1 표).</p>
+        </div>
+        <!-- SCREENSHOT: C-01 메모리 설정 (레거시 환경, 2026-08-26 실제 캡처) -->
+        <figure>
+          <img src="images/claude_custom_05_C-01.png" alt="claude.ai 설정 > 기능 화면의 메모리 구획. '채팅 검색 및 참조' 토글이 켜져 있고 빨간 테두리로 강조되어 있으며, '채팅 기록에서 기억 생성' 토글에는 레거시 표시가 붙어 있고 꺼져 있다. 그 아래 '다른 AI 제공업체에서 메모리 가져오기' 기능도 보인다.">
+          <figcaption>[C-01] 메모리와 이전 채팅 검색은 별개 설정이다(레거시 환경 화면, 2026-08-26 촬영). "채팅 기록에서 기억 생성"에 <strong>레거시</strong> 표시가 붙어 있는 것도 이 계정이 레거시 환경이라는 증거다.</figcaption>
+        </figure>
+      </li>
+
+      <li>
+        <span class="step-title">지금 무엇이 담겼는지 읽습니다</span>
+        <p>신규 환경은 설정 화면에 목록이 바로 보입니다. 레거시 환경은 <span class="ui">"메모리 보기 및 편집"</span> 버튼을 눌러야 모달 창으로 열립니다(4-1). Claude가 기억하고 있는 내용을 직접 봅니다(4-4). <strong>내용을 메모장에 복사해 두세요.</strong> 6단계에서 비교합니다.</p>
+        <div class="callout callout-warn">
+          <span class="callout-title">여기서 놀랄 수도 있습니다 — 또는 아무것도 없을 수도 있습니다</span>
+          <p>내가 넣은 적 없는 내용이 있을 수 있습니다. <strong>그게 이 모듈을 하는 이유입니다.</strong> 사내 정보나 개인 정보가 담겨 있다면 6단계에서 빼세요.</p>
+          <p>반대로 <strong>목록이 비어 있거나 "메모리 보기 및 편집" 버튼 자체가 안 보일 수도 있습니다.</strong> 그러면 1단계의 <strong>메모리 생성 토글이 꺼져 있는 것</strong>입니다 — 이 경우 토글을 켜고, 새 대화를 몇 차례 나눈 뒤 다시 확인하세요(레거시는 최대 24시간, 신규는 실시간 반영, 3-3).</p>
+        </div>
+
+        <div class="capture">
+          <div class="capture-head">[캡처 C-02]</div>
+          <dl>
+            <dt>화면</dt><dd>메모리에 담긴 내용</dd>
+            <dt>진입 경로</dt><dd>메모리 설정에서 기억 내용 보기(레거시: "메모리 보기 및 편집" 버튼 클릭)</dd>
+            <dt>캡처 범위</dt><dd>항목 목록이 보이는 범위</dd>
+            <dt>강조 표시</dt><dd>없음</dd>
+            <dt>캡션</dt><dd>Claude가 무엇을 기억하는지 직접 볼 수 있다. 확인은 사용자의 몫이다.</dd>
+          </dl>
+        </div>
+        <!-- SCREENSHOT: C-02 메모리 내용 — 실촬영 대신 HTML/CSS 목업으로 대체(사유: §9 필요 캡처 목록 참고) -->
+        <figure class="mockup-figure">
+          <div class="mockup-head">[목업 C-02]</div>
+          <div class="mockup-screen">
+            <div class="mkmodal-head">
+              <span>메모리 보기 및 편집</span>
+              <span class="mkmodal-close" aria-hidden="true">×</span>
+            </div>
+            <ul class="mkmemory-list">
+              <li>
+                <span class="mkmemory-title">예시 항목 1</span>
+                <p>여기에 Claude가 기억한 내용 한 줄 요약이 표시됩니다.</p>
+              </li>
+              <li>
+                <span class="mkmemory-title">예시 항목 2</span>
+                <p>여기에 Claude가 기억한 내용 한 줄 요약이 표시됩니다.</p>
+              </li>
+              <li>
+                <span class="mkmemory-title">예시 항목 3</span>
+                <p>여기에 Claude가 기억한 내용 한 줄 요약이 표시됩니다.</p>
+              </li>
+            </ul>
+          </div>
+          <figcaption>
+            <p class="mockup-caption">[C-02] Claude가 무엇을 기억하는지 직접 볼 수 있다 — 확인은 사용자의 몫이다(항목 내용은 실제 데이터가 아닌 예시 라벨입니다).</p>
+            <p class="mockup-note"><b>실제 화면과 다를 수 있는 근사 목업입니다.</b> 2026-08-26 확인 시 이 계정(Team 플랜, 레거시 환경)은 <strong>"채팅 기록에서 기억 생성" 토글이 꺼져 있어</strong> 표시할 실제 항목이 없었습니다. 토글을 켜는 것은 계정 설정 변경이라 계정 소유자 승인 없이 임의로 켜지 않고, 실촬영 대신 목업으로 대체했습니다. 소유자가 토글을 켜고 대화를 쌓은 뒤(레거시는 최대 24시간 대기) 이 자리를 실제 캡처로 교체하세요.</p>
+          </figcaption>
+        </figure>
+      </li>
+
+      <li>
+        <span class="step-title">대조군을 만듭니다 (프롬프트 A)</span>
+        <p>새 대화를 열고 <a href="#prompt-a">프롬프트 A</a>를 보냅니다. <strong>응답을 메모장에 복사해 두세요.</strong> 5단계에서 같은 질문을 다시 합니다.</p>
+      </li>
+
+      <li>
+        <span class="step-title">기억시킵니다 (프롬프트 B)</span>
+        <p>같은 대화에서 <a href="#prompt-b">프롬프트 B</a>를 보냅니다. 업무 방식에 관한 것만 넣습니다 — <strong>사내 정보나 개인 정보는 넣지 마세요</strong>(모듈 01의 4-5와 같은 원칙).</p>
+      </li>
+
+      <li>
+        <span class="step-title">새 대화에서 반영을 확인합니다</span>
+        <p><strong>새 대화</strong>를 열고 3단계와 <strong>완전히 동일한</strong> <a href="#prompt-a">프롬프트 A</a>를 다시 보냅니다.</p>
+        <div class="callout callout-tip">
+          <span class="callout-title">3-3에서 예고한 확인 지점입니다 — 결과는 환경마다 다릅니다</span>
+          <p><strong>신규 환경</strong>이면 지금 바로 반영돼야 정상입니다(실시간 개별 항목 갱신). <strong>레거시 환경</strong>이면 지금은 <strong>반영되지 않는 것이 정상</strong>일 수 있습니다 — 24시간마다 한 번 요약이 도는 방식이기 때문입니다(4-1, 3-3). 레거시 환경이라면 이 단계는 "안 됐다"로 끝내지 말고, <strong>날짜를 메모해 뒀다가 다음 날 같은 프롬프트 A로 다시 확인</strong>하세요.</p>
+        </div>
+
+        <div class="checkpoint">
+          <span class="checkpoint-title">여기까지 — 메모리 동작 확인</span>
+          <ul>
+            <li>메모리와 이전 채팅 검색이 <strong>별개 설정</strong>임을 화면에서 확인했다</li>
+            <li>지금 담긴 내용을 직접 읽었다</li>
+            <li>같은 프롬프트로 <strong>전·후 응답 두 개</strong>를 확보했다(레거시 환경은 다음 날 확보해도 된다)</li>
+          </ul>
+          <p>신규 환경인데 차이가 없다면 ① 새 대화가 아니었거나 ② 메모리 생성이 꺼져 있을 수 있습니다. 1단계로 돌아가 확인하세요. 레거시 환경이면 하루 뒤 확인이 정상 절차입니다.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">메모리를 대화로 고칩니다 (프롬프트 C)</span>
+        <p>4-4에서 본 대로 <strong>대화로 갱신할 수 있습니다.</strong> <a href="#prompt-c">프롬프트 C</a>로 빼야 할 것을 빼고, 설정 화면에서 실제로 반영됐는지 확인합니다.</p>
+        <p>2단계에서 복사해 둔 내용과 비교하세요.</p>
+      </li>
+
+      <li>
+        <span class="step-title">이전 채팅 검색을 써 봅니다 (프롬프트 D)</span>
+        <p><a href="#prompt-d">프롬프트 D</a>로 예전 대화를 찾아 달라고 합니다. <strong>검색이 도구 호출로 표시되는지</strong> 확인하세요(4-2). 화면에는 <code>"Relevant chats"</code>라는 <strong>영문 라벨 그대로</strong> 뜹니다 — 한국어 UI에서도 이 부분만 번역되어 있지 않습니다.</p>
+
+        <div class="capture">
+          <div class="capture-head">[캡처 C-03]</div>
+          <dl>
+            <dt>화면</dt><dd>이전 채팅 검색이 도구 호출로 표시된 대화</dd>
+            <dt>진입 경로</dt><dd>새 대화에서 프롬프트 D 전송</dd>
+            <dt>캡처 범위</dt><dd>도구 호출 표시와 응답이 함께 보이는 범위</dd>
+            <dt>강조 표시</dt><dd>검색 도구 호출 표시(빨간 테두리)</dd>
+            <dt>캡션</dt><dd>이전 대화를 검색하면 도구 호출로 표시되어 언제 검색했는지 알 수 있다.</dd>
+          </dl>
+        </div>
+        <!-- SCREENSHOT: C-03 이전 채팅 검색 도구 호출 (2026-08-26 실제 캡처) -->
+        <figure>
+          <img src="images/claude_custom_05_C-03.png" alt="Claude 대화 화면에 'Relevant chats'라는 영문 도구 호출 표시가 빨간 테두리로 강조되어 있고, 그 아래 이전 대화 두 건을 찾았다는 요약 응답이 이어진다.">
+          <figcaption>[C-03] 이전 대화를 검색하면 "Relevant chats"라는 도구 호출로 표시된다(2026-08-26 실제 테스트, 실제 과거 대화 2건을 정확히 찾아 요약함). 응답 본문의 세부 내용은 실제 업무 대화라 이 캡션에는 옮기지 않습니다.</figcaption>
+        </figure>
+      </li>
+
+      <li>
+        <span class="step-title">프로젝트 경계를 확인합니다</span>
+        <p>모듈 03에서 만든 프로젝트 <strong>안에서</strong> 새 대화를 열고 프롬프트 D를 다시 보냅니다.</p>
+        <p>프로젝트 밖 대화가 <strong>검색되지 않아야</strong> 정상입니다(4-3). 검색은 각 프로젝트 안으로 한정됩니다.</p>
+      </li>
+
+      <li>
+        <span class="step-title">시크릿 채팅으로 분리합니다</span>
+        <p>프로젝트 <strong>밖에서</strong> 새 대화를 시작하고 오른쪽 위 <strong>유령 아이콘</strong>을 클릭합니다. <span class="ui">"시크릿 채팅"</span> 표시(화면 중앙에 "시크릿 모드입니다")를 확인한 뒤 아무 대화나 나눠 봅니다.</p>
+        <p>대화를 닫고 <strong>대화 목록에 남지 않는지</strong> 확인합니다.</p>
+      </li>
+
+      <li>
+        <span class="step-title">시크릿 채팅이 검색에서 빠지는지 확인합니다</span>
+        <p>새 일반 대화를 열고 <strong>시크릿 채팅에서 나눈 내용을 찾아 달라</strong>고 해 봅니다. 찾지 못해야 정상입니다(4-5).</p>
+        <div class="callout callout-danger">
+          <span class="callout-title">그렇다고 안전한 것은 아닙니다</span>
+          <p>Team·Enterprise 플랜에서는 <strong>시크릿 채팅도 데이터 내보내기에 포함되고, 기본 최소 30일간 조직의 보존 정책을 따릅니다</strong>(4-5). "Claude가 기억 안 함"과 "기록이 안 남음"은 다릅니다.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">무엇을 기억시키지 않을지 정합니다 (프롬프트 E)</span>
+        <p>마지막으로 <strong>판단</strong>을 정리합니다. <a href="#prompt-e">프롬프트 E</a>로 내 업무에서 메모리에 들어가면 안 되는 것을 목록화하고, 그런 대화를 어디서 할지 정합니다.</p>
+        <p>이 목록이 Claude 중급 코스의 마지막 산출물입니다.</p>
+
+        <div class="checkpoint">
+          <span class="checkpoint-title">여기까지 — 경계와 판단</span>
+          <ul>
+            <li>프로젝트 안팎으로 <strong>검색 범위가 나뉘는 것</strong>을 확인했다</li>
+            <li>시크릿 채팅이 검색에서 빠지는 것을 확인했다</li>
+            <li>시크릿 채팅이 <strong>기록까지 없애지는 않는다</strong>는 점을 안다</li>
+            <li>기억시키지 않을 것의 목록을 만들었다</li>
+          </ul>
+          <p>이것으로 Claude 중급 코스가 끝납니다. 모듈 01~05의 다섯 가지 맥락 관리 수단을 모두 다뤘습니다(4-6).</p>
+        </div>
+      </li>
+
+    </ol>
+  </div>
+
+  <h2>6. 예제 코드·예제 프롬프트</h2>
+
+  <div class="section practice">
+    <span class="section-kind">실습 자료</span>
+
+    <div class="callout callout-info">
+      <span class="callout-title">응답은 매번 다릅니다</span>
+      <p>아래 "예상 출력"은 <strong>응답 예시</strong>입니다. 성공 여부는 문구가 아니라 <strong>설정 화면의 실제 내용</strong>과 <strong>전·후 응답의 차이</strong>로 판단합니다.</p>
+    </div>
+
+    <h3 id="prompt-a">프롬프트 A — 전·후 비교용 대조 질문</h3>
+    <p><strong>사전 준비물:</strong> 3단계에서는 기억시키기 전의 새 대화, 5단계에서는 기억시킨 뒤의 새 대화. <strong>두 번 모두 같은 문장을 씁니다.</strong></p>
+    <div class="code-label">실행할 프롬프트 전문</div>
+<pre><code>제가 어떤 일을 하고 어떤 방식으로 일하는지 알고 계신가요?
+아는 만큼만 말씀해 주시고, 모르면 모른다고 답해 주세요. 추측하지 마세요.</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> 3단계에서는 아는 것이 없거나 적다고 답하고, 5단계에서는 프롬프트 B로 알려 준 내용을 짚습니다.</p>
+    <p><strong>성공 확인 방법:</strong> <strong>두 응답이 서로 달라야</strong> 성공입니다.</p>
+    <ul class="checklist">
+      <li><input type="checkbox" id="b1"><label for="b1">3단계에서는 <strong>모른다</strong>거나 아는 것이 적다고 답했다</label></li>
+      <li><input type="checkbox" id="b2"><label for="b2">5단계에서는 프롬프트 B의 내용을 <strong>짚었다</strong></label></li>
+    </ul>
+
+    <h3 id="prompt-b">프롬프트 B — 기억시키기</h3>
+    <p><strong>사전 준비물:</strong> 프롬프트 A를 보낸 <strong>같은 대화</strong>, 메모리 생성이 켜진 상태.</p>
+    <div class="code-label">실행할 프롬프트 전문 (괄호는 본인 상황으로)</div>
+<pre><code>앞으로 참고할 수 있게 기억해 주세요.
+
+- 저는 (직무)를 담당합니다.
+- 보고 대상은 대부분 해당 분야 비전문가입니다.
+- 결론을 먼저 쓰고, 목록은 5개 이하로 유지하는 방식을 선호합니다.
+
+사내 정보나 고객 정보는 기억하지 마세요. 업무 방식만 기억해 주세요.</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> 기억했다는 취지의 답이 나옵니다.</p>
+    <p><strong>성공 확인 방법:</strong> 설정의 메모리 화면에 <strong>해당 내용이 나타나면</strong> 성공입니다. 화면에서 확인되지 않으면 응답만으로는 확인이 아닙니다.</p>
+    <div class="callout callout-warn">
+      <span class="callout-title">여기에 무엇을 넣는지가 이 모듈의 핵심입니다</span>
+      <p>모듈 01의 계정 지침과 같은 원칙입니다 — <strong>업무 방식은 넣고 업무 내용은 넣지 마세요.</strong> 메모리는 지침과 달리 내가 지우기 전까지 계속 쌓입니다.</p>
+    </div>
+
+    <h3 id="prompt-c">프롬프트 C — 메모리 정리</h3>
+    <p><strong>사전 준비물:</strong> 2단계에서 메모리 내용을 확인하고 복사해 둔 상태.</p>
+    <div class="code-label">실행할 프롬프트 전문</div>
+<pre><code>지금 저에 대해 기억하고 있는 내용을 항목별로 알려 주세요.
+
+그중에서 아래에 해당하는 것은 기억에서 빼 주세요.
+- 특정 회사·고객·프로젝트의 이름
+- 일회성 작업이라 앞으로 쓸 일이 없는 것
+- 사실과 다르거나 낡은 것
+
+무엇을 뺐는지 알려 주세요.</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> 기억 항목이 나열되고, 해당하는 것을 제거했다는 답이 나옵니다.</p>
+    <p><strong>성공 확인 방법:</strong> <strong>설정의 메모리 화면에서 실제로 사라졌는지</strong> 확인합니다. 2단계에서 복사해 둔 내용과 비교하세요. 화면에서 확인하는 것이 유일한 검증입니다.</p>
+
+    <h3 id="prompt-d">프롬프트 D — 이전 채팅 검색</h3>
+    <p><strong>사전 준비물:</strong> 이전 채팅 검색이 켜진 상태의 <strong>새 대화</strong>. 이 계정으로 예전에 나눈 대화가 있어야 합니다.</p>
+    <div class="code-label">실행할 프롬프트 전문</div>
+<pre><code>예전에 저와 나눈 대화 중에서 회의록이나 안내문 작성과 관련된 내용을 찾아
+무엇을 했었는지 정리해 주세요. 없으면 없다고 답해 주세요.</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> 검색이 도구 호출로 표시된 뒤, 찾은 대화의 내용이 정리되어 나옵니다.</p>
+    <p><strong>성공 확인 방법:</strong> 아래 2가지를 확인합니다.</p>
+    <ul class="checklist">
+      <li><input type="checkbox" id="b3"><label for="b3">화면에 <strong>검색 도구 호출</strong>이 표시됐다</label></li>
+      <li><input type="checkbox" id="b4"><label for="b4">8단계에서 <strong>프로젝트 안</strong>에서 같은 질문을 했을 때 결과가 <strong>달라졌다</strong></label></li>
+    </ul>
+    <p class="code-caption">두 번째가 4-3의 경계를 확인하는 지점입니다. 프로젝트 안에서는 그 프로젝트의 대화만 검색됩니다.</p>
+
+    <h3 id="prompt-e">프롬프트 E — 기억시키지 않을 것 정하기</h3>
+    <p><strong>사전 준비물:</strong> 앞 단계를 모두 마친 상태.</p>
+    <div class="code-label">실행할 프롬프트 전문</div>
+<pre><code>제 업무에서 Claude의 메모리에 들어가면 곤란한 정보 유형을 정리해 주세요.
+
+각 유형에 대해 아래를 적어 주세요.
+1. 왜 곤란한가
+2. 그런 내용을 다뤄야 할 때 어디서 대화해야 하는가
+   (일반 대화 / 프로젝트 / 시크릿 채팅)
+3. 시크릿 채팅을 쓰더라도 남는 것은 무엇인가
+
+3번은 Team·Enterprise 계정에서 시크릿 채팅이 데이터 내보내기에 포함되고
+조직의 보존 정책(기본 최소 30일)을 따른다는 점을 반영해 주세요.</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> 정보 유형별로 세 항목이 정리됩니다. 3번에서 "시크릿 채팅도 기록은 남을 수 있다"는 점이 반영되어야 합니다.</p>
+    <p><strong>성공 확인 방법:</strong> 아래 2가지가 맞으면 성공입니다. 이 목록을 메모해 두고 실제 업무에 적용하세요.</p>
+    <ul class="checklist">
+      <li><input type="checkbox" id="b5"><label for="b5">유형마다 <strong>어디서 대화할지</strong>가 지정돼 있다</label></li>
+      <li><input type="checkbox" id="b6"><label for="b6">3번에 <strong>"시크릿이어도 기록은 남을 수 있다"</strong>는 취지가 들어 있다</label></li>
+    </ul>
+  </div>
+
+  <h2>7. 트러블슈팅</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>증상</th><th>원인</th><th>해결</th></tr></thead>
+        <tbody>
+          <tr>
+            <th>기억시켰는데 새 대화가 모른다</th>
+            <td>메모리 생성이 꺼져 있거나, 기존 대화에서 물어봄. <strong>레거시 환경이면 최대 24시간 지연이 정상</strong></td>
+            <td>설정에서 토글을 확인하고 <strong>새 대화</strong>에서 다시 확인합니다. 레거시 환경(4-1)이면 하루 뒤 다시 확인하세요. 설정 화면의 메모리 내용에 실제로 담겼는지도 보세요.</td>
+          </tr>
+          <tr>
+            <th>이전 채팅 검색이 안 된다</th>
+            <td>무료 플랜이거나 토글이 꺼져 있음. Enterprise는 <strong>고객 관리 암호화 키(CMEK) 사용 시</strong> 검색 자체가 불가</td>
+            <td>이전 채팅 검색은 <strong>유료 전용</strong>입니다(4-2). 유료인데 안 되면 설정에서 토글을 확인하고, Enterprise면 조직이 CMEK를 쓰는지 관리자에게 확인하세요. <span class="src">(출처: support.claude.com/ko/articles/11817273, 2026-08-26 확인)</span></td>
+          </tr>
+          <tr>
+            <th>다른 프로젝트의 대화를 못 찾는다</th>
+            <td>정상 동작 (4-3)</td>
+            <td>검색은 각 프로젝트 안으로 한정됩니다. 프로젝트 밖 대화는 프로젝트 밖에서 검색하세요.</td>
+          </tr>
+          <tr>
+            <th>메모리에서 뺐는데 다시 나타난다</th>
+            <td>같은 내용을 다시 말해서 재학습됨</td>
+            <td>기억되면 안 되는 정보는 <strong>애초에 말하지 않는 것</strong>이 유일한 방법입니다. 필요하면 시크릿 채팅에서 다루되 4-5의 한계를 기억하세요.</td>
+          </tr>
+          <tr>
+            <th>대화를 지웠는데 메모리에는 남아 있다</th>
+            <td>신규 환경에서는 정상 동작</td>
+            <td>신규 환경은 원본 대화를 지워도 메모리 항목이 자동으로 안 지워집니다(4-4). 메모리 화면에서 <strong>그 항목을 따로 삭제</strong>하세요. 레거시 환경은 대화 삭제 시 관련 요약도 함께 지워집니다.</td>
+          </tr>
+          <tr>
+            <th>인터넷 설명과 동작이 다르다</th>
+            <td>메모리가 신규·레거시 두 환경으로 나뉘어 있음</td>
+            <td>내 계정이 어느 환경인지부터 확인하세요(4-1). 일일 요약 방식은 <strong>레거시 환경에서는 아직 유효</strong>하고, <strong>신규 환경에서만 개별 항목 방식으로 바뀌었습니다</strong>(3-3). 낡은 자료 대신 <strong>직접 확인한 결과</strong>를 기준으로 삼으세요.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>7-2. 흔한 잘못된 습관</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>습관</th><th>겉으로 나타나는 모습</th><th>대응</th></tr></thead>
+        <tbody>
+          <tr>
+            <th>메모리를 한 번도 열어 보지 않는다</th>
+            <td>편리하게 잘 씀. 무엇이 쌓였는지 아무도 모름</td>
+            <td>주기적으로 설정에서 확인합니다(2단계). <strong>확인은 사용자의 몫</strong>입니다.</td>
+          </tr>
+          <tr>
+            <th>시크릿 채팅을 "안전한 방"으로 여긴다</th>
+            <td>민감한 이야기를 마음 놓고 함. Team·Enterprise 계정에서는 <strong>내보내기에 포함됨</strong></td>
+            <td>시크릿 채팅은 <strong>기억을 막는 기능</strong>이지 기록을 없애는 기능이 아닙니다(4-5).</td>
+          </tr>
+          <tr>
+            <th>업무 내용을 기억시킨다</th>
+            <td>매번 설명 안 해도 되어 편함. 고객명·프로젝트명이 계속 남음</td>
+            <td>업무 <strong>방식</strong>만 기억시킵니다. 업무 <strong>내용</strong>은 프로젝트 지식에 두세요(모듈 03).</td>
+          </tr>
+          <tr>
+            <th>낡은 인터넷 자료를 기준으로 삼는다</th>
+            <td>"내일 반영된다"고 알고 무작정 기다리거나, 반대로 "실시간"이라고 믿고 레거시 환경에서 안 된다며 포기함</td>
+            <td>제품이 자주 바뀌고 <strong>계정마다 환경도 다릅니다</strong>(4-1). <strong>공식 문서와 직접 확인</strong>을 기준으로 삼으세요(3-3).</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>8. 확인 체크리스트</h2>
+
+  <div class="section">
+    <span class="section-kind">자가 점검</span>
+    <p>이 모듈로 Claude 중급 코스가 끝납니다.</p>
+    <ul class="checklist">
+      <li><input type="checkbox" id="c1"><label for="c1">메모리와 이전 채팅 검색이 <strong>다른 기능</strong>이고 요금제 요건도 다르다는 점을 안다.</label></li>
+      <li><input type="checkbox" id="c2"><label for="c2">설정에서 메모리 내용을 확인하고 대화로 정리해 봤다.</label></li>
+      <li><input type="checkbox" id="c3"><label for="c3">검색 범위가 <strong>프로젝트 안팎으로 나뉜다</strong>는 점을 직접 확인했다.</label></li>
+      <li><input type="checkbox" id="c4"><label for="c4">시크릿 채팅(구 익명 채팅)이 <strong>기록까지 없애지는 않는다</strong>는 점을 설명할 수 있다.</label></li>
+      <li><input type="checkbox" id="c5"><label for="c5">기억시키지 않을 정보 유형을 정하고 어디서 대화할지 정했다.</label></li>
+    </ul>
+  </div>
+
+  <h2>9. 필요 캡처 목록</h2>
+
+  <div class="section">
+    <span class="section-kind">작성자용</span>
+    <p>이 모듈에는 캡처 3장이 필요합니다. <strong>2026-08-26 기준 2장(C-01, C-03)은 실제 화면으로 교체됐고, C-02는 아래 사유로 HTML/CSS 목업으로 대체했습니다.</strong></p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>번호</th><th>화면</th><th>진입 경로</th><th>캡처 범위</th><th>강조 표시</th><th>캡션</th></tr></thead>
+        <tbody>
+          <tr><td class="mod-no">C-01</td><td>메모리 설정 <span class="status status-done">완료(레거시)</span></td><td>이니셜 → <span class="ui">"설정"</span> → (레거시: "기능" 안의 메모리)</td><td>두 토글이 함께 보이는 범위</td><td>이전 채팅 검색 토글</td><td>메모리와 이전 채팅 검색은 별개 설정이다.</td></tr>
+          <tr><td class="mod-no">C-02</td><td>메모리에 담긴 내용 <span class="status status-mockup">목업 대체</span></td><td>메모리 설정에서 기억 내용 보기</td><td>항목 목록</td><td>없음</td><td>Claude가 무엇을 기억하는지 직접 볼 수 있다.</td></tr>
+          <tr><td class="mod-no">C-03</td><td>이전 채팅 검색 도구 호출 <span class="status status-done">완료</span></td><td>새 대화에서 프롬프트 D 전송</td><td>도구 호출 표시와 응답</td><td>검색 도구 호출 표시</td><td>검색하면 도구 호출로 표시되어 언제 검색했는지 알 수 있다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout callout-warn">
+      <span class="callout-title">캡처 시 주의 — 이 모듈은 특히 조심해야 합니다</span>
+      <p><strong>C-02는 실촬영 시 실제 메모리 내용이 그대로 찍힙니다.</strong> 개인 정보와 사내 정보가 담겨 있을 가능성이 높으므로, <strong>실습 전용 계정으로 촬영하거나 반드시 가린 뒤</strong> 배포하세요. C-03처럼 검색 결과에 예전 대화 제목·업무 내용이 노출되면 <strong>블러 처리하거나 캡션으로 요약</strong>하고 원문을 그대로 옮기지 마세요.</p>
+      <p><strong>C-02를 목업으로 대체한 이유:</strong> 2026-08-26 확인 당시 캡처 계정(Team 플랜, 레거시 환경)의 <span class="ui">"채팅 기록에서 기억 생성"</span> 토글이 꺼져 있어 표시할 메모리 항목이 없었습니다. 이 토글을 켜는 것은 <strong>계정 설정 변경</strong>이라 계정 소유자의 명시적 승인 없이 임의로 켜지 않고, 이 자리에는 HTML/CSS로 근사 재현한 목업을 대신 넣었습니다(실제 화면과 다를 수 있음, §7-3 참고). 계정 소유자가 토글을 켜고 실제 대화를 쌓은 뒤(레거시는 최대 24시간 대기) 이 자리를 실제 캡처로 교체하세요.</p>
+    </div>
+  </div>
+
+  <h2>10. 참고 자료</h2>
+
+  <ul class="reflist">
+    <li>Claude의 채팅 검색 및 메모리를 사용하여 이전 컨텍스트를 기반으로 구축하기 (Anthropic 지원 센터, 한국어판 — 신규·레거시 환경 구분 설명 포함) — <code>https://support.claude.com/ko/articles/11817273-claude%EC%9D%98-%EC%B1%84%ED%8C%85-%EA%B2%80%EC%83%89-%EB%B0%8F-%EB%A9%94%EB%AA%A8%EB%A6%AC%EB%A5%BC-%EC%82%AC%EC%9A%A9%ED%95%98%EC%97%AC-%EC%9D%B4%EC%A0%84-%EC%BB%A8%ED%85%8D%EC%8A%A4%ED%8A%B8%EB%A5%BC-%EA%B8%B0%EB%B0%98%EC%9C%BC%EB%A1%9C-%EA%B5%AC%EC%B6%95%ED%95%98%EA%B8%B0</code> <span class="ref-date">2026-08-26 확인</span></li>
+    <li>Release notes (Anthropic Help Center) — <code>https://support.claude.com/en/articles/12138966-release-notes</code> <span class="ref-date">2026-08-20 확인, 재확인 안 됨</span></li>
+    <li>Introducing memory (Anthropic 공식 발표) — <code>https://www.anthropic.com/news/memory</code> <span class="ref-date">2026-08-20 확인, 재확인 안 됨</span></li>
+    <li>익명 채팅 사용 (한국어판 — 2026-08-26 기준 문서 제목은 아직 "익명 채팅"이나, 실제 화면 표기는 "시크릿 채팅"으로 확인됨) — <code>https://support.claude.com/ko/articles/12260368</code> <span class="ref-date">2026-08-26 확인</span></li>
+    <li>claude.ai 실사용 확인 — 계정: Ho Tech(Team 플랜), 설정 &gt; 기능의 메모리 구획, 시크릿 채팅 진입 화면, 이전 채팅 검색의 도구 호출 표시를 직접 조작해 확인 <span class="ref-date">2026-08-26 확인</span></li>
+  </ul>
+
+  <div class="callout callout-info">
+    <span class="callout-title">사실 확인 기준</span>
+    <p>메모리와 이전 채팅 검색이 별개 기능이며 <strong>요금제 요건이 다르다</strong>는 점, 검색이 RAG로 동작하며 도구 호출로 표시된다는 점, <strong>검색 범위가 프로젝트 안팎으로 나뉜다</strong>는 점, 기억되는 것이 업무 관련 맥락이고 설정에서 확인·갱신할 수 있다는 점, 시크릿 채팅의 유령 아이콘과 동작, 그리고 <strong>Team·Enterprise 계정에서 시크릿 채팅도 데이터 내보내기에 포함된다</strong>는 점을 공식 지원 문서와 2026-08-26 직접 조작 테스트로 확인했습니다.</p>
+    <p><strong>2026-08-26 재확인에서 새로 드러난 것(중요):</strong> ① 메모리는 <strong>신규 환경(Free·Pro·Max, 실시간 개별 항목)과 레거시 환경(Team·Enterprise, 24시간 요약)이 현재 공존</strong>하며, 지난 버전이 "낡은 설명"이라고 단정했던 일일 요약 방식은 <strong>레거시 환경에서는 여전히 사실</strong>입니다. ② 메모리 설정 화면 위치도 환경별로 다릅니다(설정 &gt; 메모리 vs 설정 &gt; 기능 &gt; 메모리). ③ "익명 채팅"이라는 이름은 <strong>실제 화면에서 "시크릿 채팅"으로 바뀌어 있었고</strong>, 지원 센터 문서는 아직 옛 이름을 씁니다. ④ 대화를 지워도 메모리가 자동으로 지워지는지는 환경마다 다릅니다. 지난 버전이 <span class="unverified">공식 자료 미확인</span>으로 남겼던 한국어 라벨 2건("채팅 검색 및 참조", 메모리 설정 화면 위치)은 이번에 직접 조작으로 확인해 확정했습니다(3-2). 이번에도 확인하지 못한 것은 <strong>신규 환경(Free·Pro·Max)의 실제 화면</strong>입니다 — 이 캡처 계정이 Team 플랜(레거시)이라 재현할 수 없었고, 공식 문서 서술로만 반영했습니다.</p>
+  </div>
+
+  <div class="doc-footer">
+    <span>Claude · 중급 · 모듈 05 (claude_custom_05_memory.html)</span>
+    <span class="checked-date">최종 확인일: 2026-08-26</span>
+  </div>
+
+</div>
+</div><!-- /.layout -->
+
+<script>
+(function(){
+  var COURSES = [{"id":"claude-basic","product":"Claude","track":"basic","trackLabel":"초급","status":"done","modules":[{"no":"01","file":"claude_basic_01_first-chat.html","title":"접속과 첫 대화, 프롬프트 기초"},{"no":"02","file":"claude_basic_02_interface-and-chats.html","title":"화면 구성과 대화 관리"},{"no":"03","file":"claude_basic_03_file-upload.html","title":"파일 업로드로 문서 질의하기"},{"no":"04","file":"claude_basic_04_model-and-effort.html","title":"모델 선택과 응답 조절"},{"no":"05","file":"claude_basic_05_artifacts.html","title":"아티팩트로 결과물 만들고 내보내기"}]},{"id":"cowork-basic","product":"Claude Cowork","track":"basic","trackLabel":"초급","status":"todo","modules":[]},{"id":"code-basic","product":"Claude Code","track":"basic","trackLabel":"초급","status":"done","modules":[{"no":"01","file":"code_basic_01_install-and-first-session.html","title":"설치와 첫 세션"},{"no":"02","file":"code_basic_02_permissions-and-safety.html","title":"권한 모드와 안전장치"},{"no":"03","file":"code_basic_03_first-change-and-commit.html","title":"첫 코드 변경과 커밋"},{"no":"04","file":"code_basic_04_claude-md.html","title":"CLAUDE.md로 프로젝트 컨텍스트 남기기"},{"no":"05","file":"code_basic_05_project-structure.html","title":"Claude Code 폴더 구조 총정리"}]},{"id":"design-basic","product":"Claude Design","track":"basic","trackLabel":"초급","status":"todo","modules":[]},{"id":"claude-custom","product":"Claude","track":"custom","trackLabel":"중급","status":"done","modules":[{"no":"01","file":"claude_custom_01_instructions.html","title":"계정 전체 지침으로 반복 설명 없애기"},{"no":"02","file":"claude_custom_02_skills.html","title":"스킬(Skills)로 응답 방식과 반복 작업 저장하기"},{"no":"03","file":"claude_custom_03_projects.html","title":"프로젝트로 작업 공간 꾸리기"},{"no":"04","file":"claude_custom_04_connectors.html","title":"커넥터로 외부 도구 연결하기"},{"no":"05","file":"claude_custom_05_memory.html","title":"메모리와 이전 대화 활용하기"}]},{"id":"cowork-custom","product":"Claude Cowork","track":"custom","trackLabel":"중급","status":"todo","modules":[]},{"id":"code-custom","product":"Claude Code","track":"custom","trackLabel":"중급","status":"done","modules":[{"no":"01","file":"code_custom_01_codebase-recon.html","title":"기존 코드베이스 파악하기"},{"no":"02","file":"code_custom_02_settings-json.html","title":"settings.json으로 반복 승인 정리하기"},{"no":"03","file":"code_custom_03_skills.html","title":"스킬(Skills)로 반복 작업 저장하기"},{"no":"04","file":"code_custom_04_review-workflow.html","title":"코드 리뷰 워크플로 만들기"},{"no":"05","file":"code_custom_05_mcp.html","title":"MCP로 외부 도구 연결하기"}]},{"id":"design-custom","product":"Claude Design","track":"custom","trackLabel":"중급","status":"todo","modules":[]},{"id":"claude-advanced","product":"Claude","track":"advanced","trackLabel":"상급","status":"done","modules":[{"no":"01","file":"claude_advanced_01_structured-prompts.html","title":"구조화된 프롬프트 설계"},{"no":"02","file":"claude_advanced_02_examples-and-thinking.html","title":"예시와 사고 유도로 일관성 높이기"},{"no":"03","file":"claude_advanced_03_prompt-assets.html","title":"프롬프트를 재사용 자산으로 만들기"},{"no":"04","file":"claude_advanced_04_org-rollout.html","title":"조직 표준 배포 설계"}]},{"id":"cowork-advanced","product":"Claude Cowork","track":"advanced","trackLabel":"상급","status":"todo","modules":[]},{"id":"code-advanced","product":"Claude Code","track":"advanced","trackLabel":"상급","status":"done","modules":[{"no":"01","file":"code_advanced_01_hooks-guard.html","title":"훅으로 위험 경로 차단하기"},{"no":"02","file":"code_advanced_02_safety-net.html","title":"변경 안전망 — 현재 동작 박제와 자동 검증"},{"no":"03","file":"code_advanced_03_subagents.html","title":"서브에이전트로 컨텍스트와 권한 분리하기"},{"no":"04","file":"code_advanced_04_handover-system.html","title":"세션 인계 체계 운용하기"},{"no":"05","file":"code_advanced_05_automation-rollout.html","title":"무인 실행과 조직 표준 배포"}]},{"id":"design-advanced","product":"Claude Design","track":"advanced","trackLabel":"상급","status":"todo","modules":[]}];
+
+  var STATUS_LABEL = {done:'완료', writing:'작성 중', planned:'분할 확정', todo:'미착수'};
+  var currentFile = location.pathname.split('/').pop() || 'index.html';
+
+  var nav = document.getElementById('sidebarNav');
+  if(!nav) return;
+
+  /* 코스 아코디언 펼침 상태: 페이지를 이동해도 "지금 보는 모듈의 코스"를
+     자동으로 펼치지 않는다 — 오직 사용자가 직접 펼치거나 접은 이력만
+     기억한다. 아무 것도 편 적이 없으면 전부 접힌 채로 시작한다. */
+  var OPEN_STORAGE_KEY = 'curriculum-sidebar-open-courses';
+
+  function readOpenCourseIds(){
+    try{
+      var raw = window.localStorage.getItem(OPEN_STORAGE_KEY);
+      if(!raw) return [];
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    }catch(e){ return []; }
+  }
+  function writeOpenCourseIds(ids){
+    try{ window.localStorage.setItem(OPEN_STORAGE_KEY, JSON.stringify(ids)); }catch(e){}
+  }
+
+  var openCourseIds = readOpenCourseIds();
+
+  var html = '';
+  COURSES.forEach(function(course){
+    var isOpen = openCourseIds.indexOf(course.id) !== -1;
+    html += '<div class="sb-course' + (isOpen ? ' open' : '') + '" data-course="' + course.id + '">';
+    html += '<button type="button" class="sb-course-btn" data-status="' + course.status + '" aria-expanded="' + isOpen + '">';
+    html += '<span class="sb-caret" aria-hidden="true"></span>';
+    html += '<span class="sb-dot" title="' + (STATUS_LABEL[course.status]||course.status) + '"></span>';
+    html += '<span class="sb-course-name">' + course.product + ' · ' + course.trackLabel + '</span>';
+    html += '</button>';
+    if(course.modules.length){
+      html += '<ul class="sb-modules">';
+      course.modules.forEach(function(m){
+        var isCurrent = (m.file === currentFile);
+        html += '<li><a href="' + m.file + '"' + (isCurrent ? ' class="current" aria-current="page"' : '') + '>';
+        html += '<span class="sb-no">' + m.no + '</span>' + m.title;
+        html += '</a></li>';
+      });
+      html += '</ul>';
+    } else {
+      html += '<ul class="sb-modules"><li class="sb-empty">아직 모듈 없음</li></ul>';
+    }
+    html += '</div>';
+  });
+  nav.innerHTML = html;
+
+  nav.addEventListener('click', function(e){
+    var btn = e.target.closest('.sb-course-btn');
+    if(!btn) return;
+    var courseEl = btn.closest('.sb-course');
+    var courseId = courseEl.getAttribute('data-course');
+    var willOpen = !courseEl.classList.contains('open');
+    courseEl.classList.toggle('open', willOpen);
+    btn.setAttribute('aria-expanded', String(willOpen));
+
+    var ids = readOpenCourseIds();
+    var idx = ids.indexOf(courseId);
+    if(willOpen && idx === -1) ids.push(courseId);
+    if(!willOpen && idx !== -1) ids.splice(idx, 1);
+    writeOpenCourseIds(ids);
+  });
+
+  /* 현재 모듈이 속한 코스가 (사용자 조작으로) 이미 펼쳐져 있는 경우에만
+     사이드바 내부를 스크롤해 보여준다 — 접혀 있으면 건드리지 않는다. */
+  var currentLink = nav.querySelector('a.current');
+  var sidebarEl = document.getElementById('courseSidebar');
+  if(currentLink && sidebarEl && currentLink.closest('.sb-course.open')){
+    var linkTop = currentLink.offsetTop;
+    var linkBottom = linkTop + currentLink.offsetHeight;
+    var viewTop = sidebarEl.scrollTop;
+    var viewBottom = viewTop + sidebarEl.clientHeight;
+    if(linkTop < viewTop || linkBottom > viewBottom){
+      sidebarEl.scrollTop = Math.max(0, linkTop - sidebarEl.clientHeight / 2);
+    }
+  }
+
+  /* --- topbar 왼쪽 햄버거 버튼 하나로 사이드바 표시를 제어.
+     데스크톱(960px 초과): 기본 표시, 버튼 클릭 시 숨김(폭 반환).
+     모바일(960px 이하): 기본 숨김(오버레이), 버튼 클릭 시 오버레이로 표시.
+     "다음/이전 모듈"로 페이지를 이동해도 직전에 선택한 표시 상태가
+     이어지도록 localStorage에 저장한다(파일마다 독립 실행되는 정적
+     페이지라 이 값 없이는 이동할 때마다 항상 기본 상태로 되돌아간다). */
+  var VISIBLE_STORAGE_KEY = 'curriculum-sidebar-visible';
+  var fab = document.getElementById('sbFab');
+  var backdrop = document.getElementById('sidebarBackdrop');
+  var mq = window.matchMedia('(max-width:960px)');
+
+  /* 모바일 topbar는 화면 폭에 따라 2~3줄로 접힐 수 있다. 고정 px 값 대신
+     실제 높이를 CSS 변수로 넘겨 사이드바 첫 항목이 topbar 뒤에 가려지지 않게 한다. */
+  function syncTopbarHeight(){
+    var topbar = document.querySelector('.topbar');
+    if(!topbar) return;
+    var h = Math.ceil(topbar.getBoundingClientRect().height);
+    document.documentElement.style.setProperty('--curriculum-topbar-height', h + 'px');
+  }
+
+  function readStoredVisible(){
+    try{
+      var v = window.localStorage.getItem(VISIBLE_STORAGE_KEY);
+      return v === null ? null : v === '1';
+    }catch(e){ return null; } /* 저장소 접근 불가 환경(파일 직접 열람 등) 대비 */
+  }
+  function writeStoredVisible(visible){
+    try{ window.localStorage.setItem(VISIBLE_STORAGE_KEY, visible ? '1' : '0'); }catch(e){}
+  }
+
+  function applyVisible(visible){
+    if(mq.matches){
+      document.body.classList.toggle('sidebar-open', visible);
+      document.body.classList.remove('sidebar-hidden');
+    } else {
+      document.body.classList.toggle('sidebar-hidden', !visible);
+      document.body.classList.remove('sidebar-open');
+    }
+    if(fab) fab.setAttribute('aria-expanded', String(visible));
+  }
+
+  syncTopbarHeight();
+  var stored = readStoredVisible();
+  var initialVisible = stored === null ? !mq.matches : stored;
+  applyVisible(initialVisible);
+
+  if(fab){
+    fab.addEventListener('click', function(){
+      var nowVisible = mq.matches
+        ? document.body.classList.contains('sidebar-open')
+        : !document.body.classList.contains('sidebar-hidden');
+      var next = !nowVisible;
+      applyVisible(next);
+      writeStoredVisible(next);
+    });
+  }
+  if(backdrop){
+    backdrop.addEventListener('click', function(){
+      applyVisible(false);
+      writeStoredVisible(false);
+    });
+  }
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && mq.matches && document.body.classList.contains('sidebar-open')){
+      applyVisible(false);
+      writeStoredVisible(false);
+    }
+  });
+  /* 데스크톱 <-> 모바일 경계를 넘나들며 화면 폭을 바꾸는 경우에도
+     저장된 선호에 맞춰 다시 계산 (모바일 오버레이 클래스와 데스크톱
+     폭-반환 클래스가 서로 섞이지 않도록) */
+  mq.addEventListener('change', function(){
+    syncTopbarHeight();
+    var v = readStoredVisible();
+    applyVisible(v === null ? !mq.matches : v);
+  });
+  window.addEventListener('resize', syncTopbarHeight);
+})();
+</script>
+
+</body>
+</html>

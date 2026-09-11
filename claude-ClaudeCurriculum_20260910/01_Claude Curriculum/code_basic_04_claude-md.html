@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code 초급 04 — CLAUDE.md로 프로젝트 컨텍스트 남기기</title>
+<style>
+/* ==========================================================================
+   Anthropic 제품 교육 커리큘럼 — 공용 스타일시트
+   버전: v1.1 / 확정일: 2026-08-19 (v1.1: 2026-08-20 .checkpoint 추가)
+   적용 대상: index.html, glossary.html, 모든 모듈 HTML 파일
+   원칙: 외부 CDN·웹폰트·이미지 참조 없음(오프라인 열람 가능)
+   사용법: 이 블록 전체를 각 파일의 <style> 안에 그대로 복사한다.
+          수정 시 기존 모든 파일에 동일하게 반영한다.
+   ========================================================================== */
+
+/* --- 1. 토큰 ------------------------------------------------------------ */
+:root{
+  --ink:#1B1F24;
+  --body:#3A3F46;
+  --muted:#6B7280;
+  --line:#E6E9EE;
+  --line-strong:#D2D9E3;
+  --bg:#FFFFFF;
+  --bg-soft:#F7F9FC;
+  --bg-practice:#F3F7FC;
+  --bg-code:#1E2430;
+
+  --blue:#2F6FCB;
+  --blue-dark:#255AA8;
+  --accent:#E2612B;
+
+  --track-basic:#2F6FCB;
+  --track-custom:#0E8A6B;
+  --track-advanced:#7A3E9D;
+  --track:var(--blue);          /* body[data-track]에서 덮어씀 */
+
+  --info:#2F6FCB;   --info-bg:#F0F5FC;
+  --tip:#0E8A6B;    --tip-bg:#EEF7F3;
+  --warn:#B76A08;   --warn-bg:#FDF6EA;
+  --danger:#C0392B; --danger-bg:#FDF1EF;
+
+  --st-todo:#6B7280;   --st-todo-bg:#F1F3F6;
+  --st-planned:#2F6FCB;--st-planned-bg:#EDF3FC;
+  --st-writing:#B76A08;--st-writing-bg:#FDF6EA;
+  --st-done:#0E8A6B;   --st-done-bg:#EAF6F1;
+  --st-mockup:#0E7C86; --st-mockup-bg:#E9F6F7;
+  --anno-red:#DC2626;
+
+  --radius:10px;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Apple SD Gothic Neo",
+         "Malgun Gothic","맑은 고딕","Noto Sans KR",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"D2Coding",
+         "Nanum Gothic Coding","Courier New",monospace;
+}
+
+/* 트랙별 강조색: <body data-track="basic|custom|advanced"> */
+body[data-track="basic"]   { --track:var(--track-basic); }
+body[data-track="custom"]  { --track:var(--track-custom); }
+body[data-track="advanced"]{ --track:var(--track-advanced); }
+
+/* --- 2. 기본 ------------------------------------------------------------ */
+*{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15.5px;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+.page{ max-width:940px; margin:0 auto; padding:0 24px 64px; }
+p{ margin:0 0 12px; color:var(--body); }
+a{ color:var(--blue-dark); }
+a:hover{ color:var(--accent); }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+hr{ border:0; border-top:1px solid var(--line); margin:28px 0; }
+small{ font-size:13px; color:var(--muted); }
+
+/* --- 3. 상단 내비게이션 -------------------------------------------------- */
+.topbar{
+  position:sticky; top:0; z-index:20;
+  background:rgba(255,255,255,.96);
+  border-bottom:1px solid var(--line);
+  backdrop-filter:saturate(180%) blur(6px);
+}
+.topbar-inner{
+  max-width:940px; margin:0 auto; padding:10px 24px;
+  display:flex; flex-wrap:nowrap; gap:10px 14px; align-items:center;
+  justify-content:flex-start; min-width:0;
+}
+.topbar-tags{
+  display:flex; flex:0 0 auto; flex-wrap:nowrap; gap:6px; align-items:center;
+}
+.topbar-nav{
+  display:flex; flex:1 1 auto; min-width:0; flex-wrap:nowrap; gap:6px; align-items:center;
+}
+.navlink{
+  display:inline-block; flex:0 0 auto; padding:5px 11px; border-radius:999px;
+  border:1px solid var(--line-strong); background:#fff;
+  font-size:13px; font-weight:600; color:var(--body); text-decoration:none;
+  white-space:nowrap;
+}
+/* 이전/다음만 남은 폭 안에서 줄어들며 제목을 말줄임표 처리한다. */
+.topbar-nav .navlink-step{
+  flex:0 1 auto; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.navlink:hover{ border-color:var(--track); color:var(--track); }
+.navlink.current{ background:var(--bg-soft); color:var(--muted); border-style:dashed; }
+.navlink.disabled{
+  color:#AEB4BD; border-color:var(--line); background:var(--bg-soft);
+  pointer-events:none; cursor:default;
+}
+
+/* --- 3b. 코스 사이드바 ---------------------------------------------------- */
+.layout{ display:flex; align-items:flex-start; width:100%; max-width:1180px; margin:0 auto; }
+.layout > .page{ flex:1 1 0; min-width:0; }
+.sidebar{
+  position:sticky; top:53px; flex:0 0 240px; width:240px;
+  max-height:calc(100vh - 53px); overflow-y:auto;
+  padding:18px 12px 40px 24px; box-sizing:border-box;
+  border-right:1px solid var(--line);
+  transition:margin-left .15s ease, opacity .15s ease;
+}
+.sidebar-title{
+  font-size:11px; font-weight:800; letter-spacing:.04em; color:var(--muted);
+  text-transform:uppercase; margin:0 0 10px; padding:0 4px;
+}
+.sb-course{ margin-bottom:2px; }
+.sb-course-btn{
+  display:flex; align-items:center; gap:7px; width:100%;
+  background:none; border:0; padding:7px 4px; cursor:pointer;
+  font-family:var(--sans); font-size:13.5px; font-weight:700; color:var(--ink);
+  text-align:left; border-radius:6px;
+}
+.sb-course-btn:hover{ background:var(--bg-soft); }
+.sb-course-btn .sb-caret{
+  display:inline-block; width:9px; height:9px; flex-shrink:0;
+  border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
+  transform:rotate(-45deg); transition:transform .15s ease;
+}
+.sb-course.open .sb-course-btn .sb-caret{ transform:rotate(45deg); }
+.sb-course-btn .sb-dot{
+  width:6px; height:6px; border-radius:50%; flex-shrink:0; background:var(--st-todo);
+}
+.sb-course-btn[data-status="done"] .sb-dot{ background:var(--st-done); }
+.sb-course-btn[data-status="writing"] .sb-dot{ background:var(--st-writing); }
+.sb-course-btn[data-status="planned"] .sb-dot{ background:var(--st-planned); }
+.sb-course-btn .sb-course-name{ flex:1 1 auto; }
+.sb-modules{
+  list-style:none; margin:0 0 6px; padding:0 0 0 15px;
+  display:none; border-left:1px solid var(--line); margin-left:8px;
+}
+.sb-course.open .sb-modules{ display:block; }
+.sb-modules li{ margin:0; }
+.sb-modules a{
+  display:block; padding:5px 8px; margin:1px 0;
+  font-size:12.5px; line-height:1.5; color:var(--body); text-decoration:none;
+  border-radius:5px; border-left:2px solid transparent;
+}
+.sb-modules a:hover{ background:var(--bg-soft); color:var(--track); }
+.sb-modules a .sb-no{ color:var(--muted); font-weight:700; margin-right:5px; }
+.sb-modules a.current{
+  background:var(--bg-soft); color:var(--track); font-weight:700;
+  border-left-color:var(--track);
+}
+.sb-empty{ padding:5px 8px; font-size:12px; color:var(--muted); }
+.sidebar-backdrop{ display:none; }
+
+/* 상단 topbar 맨 왼쪽(제품 태그보다 앞) 햄버거 버튼 — topbar-inner의 일반 flex 아이템이라
+   topbar가 sticky이므로 스크롤해도 함께 고정되고, 사이드바 열림/닫힘과 무관하게 항상 같은 자리 */
+.sb-fab{
+  flex:0 0 auto; order:-1;
+  width:30px; height:30px; padding:0; border-radius:7px;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--line-strong); background:#fff; cursor:pointer;
+  position:relative; z-index:1;
+}
+.sb-fab:hover{ border-color:var(--track); }
+.sb-fab .sb-fab-bar{
+  display:block; width:14px; height:2px; background:var(--body); border-radius:1px;
+  position:relative;
+}
+.sb-fab .sb-fab-bar::before, .sb-fab .sb-fab-bar::after{
+  content:""; position:absolute; left:0; width:14px; height:2px;
+  background:var(--body); border-radius:1px;
+}
+.sb-fab .sb-fab-bar::before{ top:-4px; }
+.sb-fab .sb-fab-bar::after{ top:4px; }
+
+/* 데스크톱: 사이드바 숨김 시 폭을 반환(오버레이 아님) */
+body.sidebar-hidden .sidebar{
+  width:0; flex-basis:0; padding-left:0; padding-right:0; border-right:0;
+  overflow:hidden; opacity:0; margin-left:-1px;
+}
+
+@media (max-width:960px){
+  .layout{ display:block; }
+  .sidebar{
+    position:fixed; top:var(--curriculum-topbar-height, 53px); left:0; z-index:40;
+    height:calc(100vh - var(--curriculum-topbar-height, 53px)); max-height:none; width:280px;
+    background:#fff; border-right:1px solid var(--line-strong);
+    padding:16px 14px 40px 24px;
+    transform:translateX(-100%); transition:transform .2s ease;
+    box-shadow:2px 0 18px rgba(0,0,0,.12);
+    opacity:1; /* 데스크톱 전용 opacity 규칙 무효화 */
+  }
+  /* 모바일에서는 기본이 숨김 상태. sidebar-hidden이 아니라 sidebar-open일 때만 보임 */
+  body.sidebar-open .sidebar{ transform:translateX(0); }
+  body.sidebar-hidden .sidebar{ width:280px; flex-basis:auto; overflow:visible; margin-left:0; }
+  .sidebar-backdrop{
+    display:none; position:fixed; inset:0; z-index:30;
+    background:rgba(20,24,30,.35);
+  }
+  body.sidebar-open .sidebar-backdrop{ display:block; }
+
+  /* .topbar(z-index:20, §10 공용 CSS)는 기본적으로 사이드바(40)·백드롭(30)보다
+     쌓임 순서가 낮다 — 자식 .sb-fab에 아무리 높은 z-index를 줘도 부모의
+     스택 컨텍스트를 벗어날 수 없으므로, 사이드바가 열린 동안만 topbar
+     자체의 z-index를 둘 다보다 높여 햄버거 버튼이 항상 눌리게 한다.
+     (이걸 하지 않으면 모바일에서 사이드바를 열고 나면 버튼이 그 뒤에
+     가려져 다시 눌러 닫을 방법이 없어진다.) */
+  body.sidebar-open .topbar{ z-index:41; }
+}
+
+/* --- 4. 태그 / 배지 ------------------------------------------------------ */
+.tag{
+  display:inline-block; padding:3px 10px; border-radius:999px;
+  font-size:12px; font-weight:700; line-height:1.6; white-space:nowrap;
+  border:1px solid transparent;
+}
+.tag-product{ background:#EEF1F5; color:#333A44; border-color:#DDE2E9; }
+.tag-basic{ background:#EDF3FC; color:var(--track-basic); border-color:#CFE0F6; }
+.tag-custom{ background:#EAF6F1; color:var(--track-custom); border-color:#C8E7DC; }
+.tag-advanced{ background:#F4EDFA; color:var(--track-advanced); border-color:#E0CDEF; }
+.tag-beta{ background:#FDF6EA; color:var(--warn); border-color:#F3E0BC; }
+.tag-muted{ background:#F1F3F6; color:var(--muted); border-color:#E3E7EC; }
+
+.status{
+  display:inline-block; padding:3px 10px; border-radius:6px;
+  font-size:12px; font-weight:700; white-space:nowrap;
+}
+.status-todo{ background:var(--st-todo-bg); color:var(--st-todo); }
+.status-planned{ background:var(--st-planned-bg); color:var(--st-planned); }
+.status-writing{ background:var(--st-writing-bg); color:var(--st-writing); }
+.status-done{ background:var(--st-done-bg); color:var(--st-done); }
+.status-mockup{ background:var(--st-mockup-bg); color:var(--st-mockup); }
+
+.unverified{
+  display:inline-block; padding:2px 8px; border-radius:6px;
+  background:var(--warn-bg); color:var(--warn);
+  font-size:12px; font-weight:700; border:1px dashed #EBD3A8;
+}
+
+/* --- 5. 문서 머리말 ------------------------------------------------------ */
+.doc-header{ padding:32px 0 20px; border-bottom:3px solid var(--track); margin-bottom:28px; }
+.eyebrow{
+  font-size:12.5px; font-weight:700; letter-spacing:.06em;
+  color:var(--track); text-transform:uppercase; margin:0 0 6px;
+}
+h1{ font-size:27px; font-weight:800; letter-spacing:-.01em; margin:0 0 10px; line-height:1.4; }
+h1 .hl{ color:var(--accent); }
+.lede{ font-size:15.5px; color:var(--body); margin:0; max-width:70ch; }
+
+h2{
+  font-size:20px; font-weight:800; margin:36px 0 12px; padding-left:12px;
+  border-left:5px solid var(--track); line-height:1.5;
+}
+h3{ font-size:16.5px; font-weight:700; margin:22px 0 8px; }
+h4{ font-size:15px; font-weight:700; margin:16px 0 6px; color:var(--body); }
+
+/* --- 6. 모듈 정보(메타) -------------------------------------------------- */
+.meta{
+  display:grid; grid-template-columns:150px 1fr; gap:1px;
+  background:var(--line); border:1px solid var(--line);
+  border-radius:var(--radius); overflow:hidden; margin:0 0 24px;
+}
+.meta dt{ background:var(--bg-soft); padding:9px 14px; font-size:13.5px; font-weight:700; }
+.meta dd{ background:#fff; padding:9px 14px; margin:0; font-size:13.5px; color:var(--body); }
+
+/* --- 7. 섹션(설명 영역 / 실습 영역) -------------------------------------- */
+.section{
+  background:#fff; border:1px solid var(--line); border-radius:var(--radius);
+  padding:20px 22px; margin:0 0 20px;
+}
+.section.practice{
+  background:var(--bg-practice); border-color:#D9E4F2;
+  border-left:5px solid var(--track);
+}
+.section > :first-child{ margin-top:0; }
+.section > :last-child{ margin-bottom:0; }
+.section-kind{
+  display:inline-block; margin:0 0 10px; padding:2px 9px; border-radius:5px;
+  font-size:12px; font-weight:700; letter-spacing:.02em;
+  background:#EEF1F5; color:#4B535D;
+}
+.section.practice .section-kind{ background:var(--track); color:#fff; }
+
+/* --- 8. 목록 / 단계 ------------------------------------------------------ */
+ul,ol{ margin:0 0 12px; padding-left:22px; color:var(--body); }
+li{ margin:3px 0; }
+
+.steps{ list-style:none; counter-reset:step; padding:0; margin:14px 0; }
+.steps > li{
+  counter-increment:step; position:relative;
+  padding:0 0 16px 40px; margin:0;
+  border-left:2px solid var(--line-strong); margin-left:13px;
+}
+.steps > li:last-child{ border-left-color:transparent; padding-bottom:0; }
+.steps > li::before{
+  content:counter(step,decimal-leading-zero);
+  position:absolute; left:-14px; top:0;
+  width:27px; height:27px; border-radius:50%;
+  background:var(--track); color:#fff;
+  font-size:12px; font-weight:700; font-family:var(--mono);
+  display:flex; align-items:center; justify-content:center;
+}
+.step-title{ font-weight:700; color:var(--ink); display:block; margin-bottom:4px; }
+
+/* --- 8b. 구간 체크 (긴 실습의 중간 점검) -------------------------------- */
+.checkpoint{
+  border:1px dashed var(--track); border-left:5px solid var(--track);
+  border-radius:8px; background:var(--bg-soft);
+  padding:12px 16px; margin:16px 0 4px;
+}
+.checkpoint-title{
+  display:block; font-weight:700; font-size:13.5px;
+  color:var(--track); margin-bottom:6px; letter-spacing:.01em;
+}
+.checkpoint ul{ margin:0; padding-left:20px; }
+.checkpoint li{ font-size:14px; margin:2px 0; }
+.checkpoint p{ font-size:14px; margin:6px 0 0; }
+
+/* --- 9. 코드 블록 -------------------------------------------------------- */
+pre{
+  background:var(--bg-code); color:#E8EDF5;
+  border-radius:8px; padding:14px 16px; margin:10px 0 14px;
+  overflow-x:auto; line-height:1.65;
+}
+pre code{
+  font-family:var(--mono); font-size:13px;
+  background:none; color:inherit; padding:0; border:0; white-space:pre;
+}
+code{
+  font-family:var(--mono); font-size:.9em;
+  background:#EEF1F5; color:#243044;
+  padding:1px 5px; border-radius:4px; border:1px solid #E1E6EC;
+}
+.code-label{
+  display:inline-block; margin:12px 0 0; padding:3px 10px;
+  border-radius:6px 6px 0 0; background:#2B3444; color:#C9D4E3;
+  font-family:var(--mono); font-size:11.5px; font-weight:700;
+}
+.code-label + pre{ margin-top:0; border-top-left-radius:0; }
+.code-caption{ font-size:12.5px; color:var(--muted); margin:-8px 0 14px; }
+
+/* UI 명칭·메뉴 경로 표기 */
+.ui{ font-weight:700; color:var(--ink); }
+.path{ font-family:var(--mono); font-size:.92em; color:var(--blue-dark); }
+
+/* --- 10. 콜아웃(경고·주의 박스) ------------------------------------------ */
+.callout{
+  border:1px solid; border-left-width:5px; border-radius:8px;
+  padding:12px 16px; margin:14px 0;
+}
+.callout > :first-child{ margin-top:0; }
+.callout > :last-child{ margin-bottom:0; }
+.callout-title{ display:block; font-weight:700; font-size:14px; margin-bottom:4px; }
+.callout p, .callout li{ font-size:14.5px; }
+.callout-info{ background:var(--info-bg); border-color:#CFE0F6; border-left-color:var(--info); }
+.callout-info .callout-title{ color:var(--info); }
+.callout-tip{ background:var(--tip-bg); border-color:#C8E7DC; border-left-color:var(--tip); }
+.callout-tip .callout-title{ color:var(--tip); }
+.callout-warn{ background:var(--warn-bg); border-color:#F3E0BC; border-left-color:var(--warn); }
+.callout-warn .callout-title{ color:var(--warn); }
+.callout-danger{ background:var(--danger-bg); border-color:#F5CFC9; border-left-color:var(--danger); }
+.callout-danger .callout-title{ color:var(--danger); }
+
+/* --- 11. 체크리스트 ------------------------------------------------------ */
+.checklist{ list-style:none; padding:0; margin:12px 0; }
+.checklist li{
+  display:flex; gap:10px; align-items:flex-start;
+  padding:9px 13px; margin:0 0 7px;
+  background:#fff; border:1px solid var(--line); border-radius:8px;
+  font-size:14.5px; color:var(--body);
+}
+.checklist input[type="checkbox"]{
+  width:16px; height:16px; margin:5px 0 0; flex-shrink:0;
+  accent-color:var(--track); cursor:pointer;
+}
+.checklist label{ cursor:pointer; }
+
+/* --- 12. 표 -------------------------------------------------------------- */
+.table-wrap{ overflow-x:auto; margin:12px 0 18px; }
+table{
+  width:100%; border-collapse:collapse;
+  border:1px solid var(--line); border-radius:var(--radius);
+  overflow:hidden; font-size:14px;
+}
+thead th{
+  background:var(--blue); color:#fff; font-weight:700;
+  text-align:left; padding:9px 13px; white-space:nowrap;
+}
+tbody td, tbody th{
+  border-top:1px solid var(--line); padding:9px 13px;
+  color:var(--body); vertical-align:top; text-align:left;
+}
+tbody th{ font-weight:700; color:var(--ink); background:var(--bg-soft); }
+tbody tr:nth-child(even) td{ background:var(--bg-soft); }
+td code, th code{ white-space:nowrap; }
+
+/* --- 13. 캡처 지시서 / 자리표시 ------------------------------------------ */
+.capture{
+  border:1px solid var(--line-strong); border-radius:8px;
+  background:#fff; margin:14px 0; overflow:hidden;
+}
+.capture-head{
+  background:#2B3444; color:#fff; padding:7px 14px;
+  font-size:13px; font-weight:700; font-family:var(--mono);
+}
+.capture dl{
+  display:grid; grid-template-columns:96px 1fr; gap:0;
+  margin:0; padding:10px 14px; font-size:13.5px;
+}
+.capture dt{ font-weight:700; color:var(--ink); padding:3px 0; }
+.capture dd{ margin:0; padding:3px 0; color:var(--body); }
+
+.screenshot-placeholder{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:130px; padding:22px 18px; margin:12px 0 16px;
+  border:2px dashed var(--line-strong); border-radius:8px;
+  background:repeating-linear-gradient(45deg,#FAFBFD,#FAFBFD 10px,#F3F6FA 10px,#F3F6FA 20px);
+  text-align:center;
+}
+.screenshot-placeholder .ph-no{
+  font-family:var(--mono); font-size:12.5px; font-weight:700;
+  color:#fff; background:#2B3444; padding:2px 9px; border-radius:5px; margin-bottom:8px;
+}
+.screenshot-placeholder .ph-desc{ font-size:13.5px; color:var(--muted); margin:0; max-width:52ch; }
+figure{ margin:12px 0 16px; }
+figure img{ max-width:100%; height:auto; border:1px solid var(--line-strong); border-radius:8px; display:block; }
+figcaption{ font-size:13px; color:var(--muted); margin-top:6px; }
+
+/* --- 13b. 목업(실촬영 대체) — 캡처 불가 시 HTML/CSS 근사 재현 --------------
+   실제 화면을 촬영할 수 없을 때(계정 데이터 훼손·계정 설정 변경 등 학습자
+   동의 없이는 할 수 없는 경우, 또는 CLI·브라우저 재현) 쓰는 근사 재현
+   컴포넌트. .capture-head와 짝을 이루되 색·형태로 구분해 실제 캡처
+   (.screenshot-placeholder, <figure><img>)와 시각적으로 구별한다.
+   §7-3 참고, 실제 화면과 다를 수 있음.
+   - .mock-note, .tui*, .browser-mock*, .chip, .btn-* : 터미널·브라우저 UI 근사
+   - .mockup-figure, .mkchat-*, .mkmodal-*, .mkmemory-* : 채팅·모달 UI 근사
+   ========================================================================== */
+
+.mock-note{
+  display:block;
+  background:var(--warn-bg); border:1px dashed #EBD3A8; border-radius:8px;
+  padding:9px 13px; margin:12px 0; font-size:13px; color:#7A5716; line-height:1.65;
+}
+.mock-note b{ color:var(--warn); margin-right:4px; }
+.tui{
+  border-radius:8px; overflow:hidden; margin:10px 0 16px;
+  border:1px solid #11151D; box-shadow:0 1px 3px rgba(0,0,0,.15);
+}
+.tui-bar{
+  background:#2B3444; color:#9AA6B8; padding:7px 12px;
+  font-family:var(--mono); font-size:11px; font-weight:700;
+  display:flex; align-items:center; gap:7px;
+}
+.tui-bar .dot{ width:9px; height:9px; border-radius:50%; background:#4A5468; display:inline-block; }
+.tui-body{
+  background:var(--bg-code); color:#DCE3ED;
+  font-family:var(--mono); font-size:12.5px; line-height:1.7;
+  padding:14px 16px; white-space:pre-wrap; overflow-x:auto; margin:0; border:0;
+}
+.tui-body .dim{ color:#7C8797; }
+.tui-body .accent{ color:#7FB0F2; }
+.tui-body .warn{ color:#E8B85C; }
+.tui-body .good{ color:#7FCF9F; }
+.tui-body .danger{ color:#E5877A; }
+.tui-body .hl{
+  display:inline-block; outline:2px solid var(--accent); outline-offset:2px; border-radius:3px;
+}
+.browser-mock{
+  border-radius:8px; overflow:hidden; margin:10px 0 16px;
+  border:1px solid var(--line-strong); background:#fff;
+}
+.browser-bar{
+  background:#EEF1F5; border-bottom:1px solid var(--line-strong);
+  padding:8px 12px; display:flex; align-items:center; gap:8px;
+}
+.browser-bar .dot{ width:9px; height:9px; border-radius:50%; background:#D5DAE1; display:inline-block; }
+.browser-url{
+  flex:1; background:#fff; border:1px solid var(--line-strong); border-radius:999px;
+  padding:4px 12px; font-family:var(--mono); font-size:11.5px; color:var(--muted);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.browser-content{ padding:26px 28px; }
+.browser-content h4{ margin:0 0 6px; font-size:15.5px; color:var(--ink); }
+.browser-content p{ font-size:13.5px; }
+.chip{
+  display:inline-flex; align-items:center; gap:6px; padding:5px 11px;
+  border:1px solid var(--line-strong); border-radius:999px; font-size:12.5px;
+  color:var(--body); background:var(--bg-soft); margin:6px 0;
+}
+.btn-row{ display:flex; gap:10px; margin-top:16px; }
+.btn-mock{
+  padding:8px 16px; border-radius:7px; font-size:13.5px; font-weight:700;
+  border:1px solid var(--line-strong); background:#fff; color:var(--body);
+}
+.btn-mock.primary{ background:var(--track); color:#fff; border-color:var(--track); }
+.btn-mock.hl{ outline:2px solid var(--accent); outline-offset:2px; }
+
+.mockup-figure{
+  border:1px solid var(--line-strong); border-radius:8px;
+  background:#fff; margin:12px 0 16px; overflow:hidden;
+}
+.mockup-head{
+  background:var(--st-mockup); color:#fff; padding:7px 14px;
+  font-size:13px; font-weight:700; font-family:var(--mono);
+}
+.mockup-screen{
+  margin:14px; border:1px solid var(--line-strong); border-radius:8px;
+  background:#fff; overflow:hidden;
+}
+.mockup-figure figcaption{ padding:0 14px 14px; margin-top:0; }
+.mockup-caption{ font-size:13px; color:var(--body); margin:10px 0 8px; }
+.mockup-caption b{ color:var(--ink); }
+.mockup-note{
+  font-size:12.5px; color:var(--body); background:var(--st-mockup-bg);
+  border:1px solid #C6E7EA; border-radius:6px; padding:9px 11px; margin:0;
+}
+.mockup-note b{ color:var(--st-mockup); }
+
+/* claude.ai 대화 화면 근사 — 배색·구도만 근사, 실제 화면과 다를 수 있음 */
+.mkchat{ padding:20px 22px 22px; }
+.mkchat-user-row{ display:flex; justify-content:flex-end; margin:0 0 18px; }
+.mkchat-bubble{
+  max-width:74%; background:#F0EEE6; color:var(--ink);
+  border-radius:16px; padding:9px 15px; font-size:13.5px; line-height:1.5;
+}
+.mkchat-assistant-row{ display:flex; gap:11px; align-items:flex-start; }
+.mkchat-avatar{
+  flex:0 0 auto; width:22px; height:22px; margin-top:1px;
+  border-radius:7px; background:#D97757;
+}
+.mkchat-body{ flex:1 1 auto; min-width:0; }
+.mkchat-lead{
+  display:inline-block; font-weight:700; font-size:14px; color:var(--ink);
+  border:2px solid var(--anno-red); border-radius:6px;
+  padding:5px 10px; margin:0 0 10px; line-height:1.4;
+}
+.mkchat-list{ margin:0; padding-left:19px; }
+.mkchat-list li{ font-size:13.5px; color:var(--body); margin:4px 0; }
+
+/* claude.ai 모달/목록 화면 근사 — 배색·구도만 근사, 실제 화면과 다를 수 있음 */
+.mkmodal-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 20px; border-bottom:1px solid var(--line);
+  font-size:14.5px; font-weight:700; color:var(--ink);
+}
+.mkmodal-close{ font-size:16px; color:var(--muted); line-height:1; font-weight:400; }
+.mkmemory-list{ list-style:none; margin:0; padding:6px 20px 18px; }
+.mkmemory-list li{ padding:12px 0; border-top:1px solid var(--line); }
+.mkmemory-list li:first-child{ border-top:0; }
+.mkmemory-title{ display:block; font-size:13.5px; font-weight:700; color:var(--ink); margin-bottom:3px; }
+.mkmemory-list p{ margin:0; font-size:12.5px; color:var(--muted); }
+
+/* --- 14. 출처 / 참고 자료 ------------------------------------------------ */
+.src{ font-size:12.5px; color:var(--muted); }
+.reflist{ list-style:none; padding:0; margin:10px 0; }
+.reflist li{
+  padding:8px 0; border-bottom:1px dashed var(--line); font-size:13.5px; color:var(--body);
+}
+.reflist li:last-child{ border-bottom:0; }
+.reflist .ref-date{ color:var(--muted); font-size:12.5px; }
+
+/* --- 15. index.html 전용 ------------------------------------------------- */
+.progress{
+  display:flex; flex-wrap:wrap; gap:10px; margin:0 0 24px;
+}
+.progress-card{
+  flex:1 1 200px; border:1px solid var(--line); border-radius:var(--radius);
+  background:var(--bg-soft); padding:14px 16px;
+}
+.progress-card .pc-label{ font-size:12.5px; font-weight:700; color:var(--muted); display:block; }
+.progress-card .pc-value{ font-size:22px; font-weight:800; color:var(--ink); font-family:var(--mono); }
+.progress-card .pc-note{ font-size:12.5px; color:var(--muted); display:block; margin-top:2px; }
+
+.part{ margin:0 0 10px; }
+.course{
+  border:1px solid var(--line); border-left:5px solid var(--track);
+  border-radius:var(--radius); background:#fff; padding:16px 18px; margin:0 0 14px;
+}
+.course[data-track="basic"]{ --track:var(--track-basic); }
+.course[data-track="custom"]{ --track:var(--track-custom); }
+.course[data-track="advanced"]{ --track:var(--track-advanced); }
+.course-head{
+  display:flex; flex-wrap:wrap; gap:8px 12px;
+  align-items:center; justify-content:space-between; margin-bottom:8px;
+}
+.course-head h3{ margin:0; font-size:16.5px; }
+.course-id{ display:flex; flex-wrap:wrap; gap:7px; align-items:center; }
+.course-note{ font-size:13.5px; color:var(--muted); margin:0 0 10px; }
+.module-table{ font-size:13.5px; }
+.module-table .mod-no{ font-family:var(--mono); font-weight:700; white-space:nowrap; }
+.module-table .empty-row td{
+  text-align:center; color:var(--muted); font-size:13px;
+  background:var(--bg-soft); padding:14px;
+}
+
+/* --- 16. glossary.html 전용 --------------------------------------------- */
+.filter-bar{ margin:0 0 18px; }
+.filter-bar input{
+  width:100%; max-width:420px; padding:9px 13px;
+  border:1px solid var(--line-strong); border-radius:8px;
+  font-family:var(--sans); font-size:14.5px; color:var(--ink); background:#fff;
+}
+.filter-bar input:focus{ outline:2px solid var(--track); outline-offset:1px; }
+.filter-count{ font-size:13px; color:var(--muted); margin-left:10px; }
+.term-table td:first-child{ width:230px; }
+.term{ font-weight:700; color:var(--ink); display:block; }
+.term-en{ font-family:var(--mono); font-size:12.5px; color:var(--muted); display:block; }
+.term-row.is-hidden{ display:none; }
+.no-result{ padding:18px; text-align:center; color:var(--muted); font-size:14px; }
+
+/* --- 17. 푸터 ----------------------------------------------------------- */
+.doc-footer{
+  margin-top:40px; padding-top:16px; border-top:1px solid var(--line);
+  font-size:13px; color:var(--muted);
+  display:flex; flex-wrap:wrap; gap:6px 18px; justify-content:space-between;
+}
+.doc-footer .checked-date{ font-weight:700; color:var(--body); }
+
+/* --- 18. 반응형 --------------------------------------------------------- */
+@media (max-width:720px){
+  body{ font-size:15px; }
+  .page{ padding:0 16px 48px; }
+  .topbar-inner{
+    padding:9px 16px;
+    overflow-x:auto; overflow-y:hidden;
+    scrollbar-width:none; overscroll-behavior-x:contain;
+  }
+  .topbar-inner::-webkit-scrollbar{ display:none; }
+  .topbar-nav{ flex:0 0 auto; }
+  .topbar-nav .navlink-step{ max-width:180px; }
+  h1{ font-size:23px; }
+  h2{ font-size:18px; }
+  .meta{ grid-template-columns:1fr; }
+  .meta dt{ padding-bottom:2px; }
+  .capture dl{ grid-template-columns:1fr; }
+  .capture dt{ padding-bottom:0; }
+  .term-table td:first-child{ width:auto; }
+  .section{ padding:16px; }
+  .mkchat{ padding:16px; }
+  .mkchat-bubble{ max-width:86%; }
+  .mkmodal-head{ padding:14px 16px; }
+  .mkmemory-list{ padding:4px 16px 16px; }
+}
+
+/* --- 19. 인쇄 ----------------------------------------------------------- */
+@media print{
+  .topbar, .filter-bar, .sidebar, .sidebar-backdrop, .sb-fab{ display:none; }
+  body{ font-size:11pt; }
+  .page{ max-width:none; padding:0; }
+  .layout{ display:block; max-width:none; }
+  .section, .course, .callout, .capture, .checklist li, .mockup-figure, .tui, .browser-mock{
+    break-inside:avoid; page-break-inside:avoid;
+  }
+  pre{ background:#F2F4F7; color:#111; border:1px solid #CCC; white-space:pre-wrap; }
+  thead th{ background:#DDE3EC !important; color:#111 !important; }
+  a{ color:#111; text-decoration:underline; }
+}
+
+/* --- 20. 모션 축소 선호 -------------------------------------------------- */
+@media (prefers-reduced-motion:reduce){
+  html{ scroll-behavior:auto; }
+  *{ animation:none !important; transition:none !important; }
+}
+</style>
+</head>
+<body data-track="basic">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-tags">
+      <button type="button" class="sb-fab" id="sbFab" aria-expanded="true" aria-controls="courseSidebar" aria-label="전체 코스 목록 열기/닫기">
+        <span class="sb-fab-bar" aria-hidden="true"></span>
+      </button>
+      <span class="tag tag-product">Claude Code</span>
+      <span class="tag tag-basic">초급 basic</span>
+      <span class="tag tag-muted">모듈 04</span>
+    </div>
+    <nav class="topbar-nav" aria-label="문서 이동">
+      <a class="navlink navlink-step" href="code_basic_03_first-change-and-commit.html">이전: 03 첫 코드 변경과 커밋</a>
+      <a class="navlink navlink-step" href="code_basic_05_project-structure.html">다음: 05 폴더 구조 총정리</a>
+      <a class="navlink" href="index.html">로드맵</a>
+      <a class="navlink" href="glossary.html">용어집</a>
+    </nav>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="courseSidebar" aria-label="전체 코스 목록">
+    <p class="sidebar-title">전체 코스</p>
+    <div id="sidebarNav"></div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<div class="page">
+
+  <div class="doc-header">
+    <p class="eyebrow">Claude Code · 초급 · 모듈 04</p>
+    <h1>CLAUDE.md로 <span class="hl">프로젝트 컨텍스트</span> 남기기</h1>
+    <p class="lede">매 세션마다 같은 설명을 반복하지 않도록, 프로젝트 규칙을 파일로 남깁니다. <code>/init</code>으로 초안을 만들고 직접 다듬은 뒤, 실제로 로드되는지까지 확인합니다.</p>
+  </div>
+
+  <h2>1. 모듈 정보</h2>
+
+  <dl class="meta">
+    <dt>제품</dt><dd>Claude Code</dd>
+    <dt>트랙</dt><dd>초급 (basic)</dd>
+    <dt>번호 · 제목</dt><dd>04 · CLAUDE.md로 프로젝트 컨텍스트 남기기</dd>
+    <dt>예상 소요 시간</dt><dd>35분 (읽기 12분 + 실습 23분)</dd>
+    <dt>확인 기준일</dt><dd>2026-08-26</dd>
+    <dt>기준 요금제</dt><dd>Pro 이상. 이 모듈은 Manual 모드로 진행하므로 플랜에 따른 동작 차이가 없습니다.</dd>
+    <dt>기준 버전</dt><dd>모듈 01에서 기록한 버전.</dd>
+  </dl>
+
+  <h2>2. 학습 목표</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+    <p>이 모듈을 마치면 다음을 할 수 있습니다.</p>
+    <ol>
+      <li>CLAUDE.md가 하는 일과 어디에 두어야 하는지 설명할 수 있다.</li>
+      <li><code>/init</code>으로 초안을 만들고 프로젝트에 맞게 다듬을 수 있다.</li>
+      <li><code>/context</code>로 파일이 실제로 로드됐는지 확인할 수 있다.</li>
+    </ol>
+  </div>
+
+  <h2>3. 사전 준비</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+
+    <h3>3-1. 준비물</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>항목</th><th>내용</th></tr></thead>
+        <tbody>
+          <tr><th>필요 플랜</th><td>Pro 이상.</td></tr>
+          <tr><th>설치</th><td>모듈 01에서 완료. 추가 설치 없음.</td></tr>
+          <tr><th>사전 지식</th><td><a href="code_basic_03_first-change-and-commit.html">모듈 03</a> 수료 — 변경 승인, 대화로 커밋.</td></tr>
+          <tr><th>실습 대상</th><td>모듈 01~03에서 써 온 <strong>같은 샌드박스</strong>. 모듈 03의 커밋까지 마친 상태여야 합니다.</td></tr>
+          <tr><th>예상 사용량</th><td>프롬프트 3회 + <code>/init</code> 1회. <code>/init</code>은 코드베이스 전체를 훑으므로 일반 프롬프트보다 많이 씁니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>3-2. 이 문서의 표기 방식</h3>
+    <p>모듈 01~03과 같습니다. 커맨드·파일명·화면 문구는 영문 원문 그대로 싣고 설명만 한국어로 씁니다.</p>
+
+    <h3>3-3. 이 모듈이 만드는 파일</h3>
+    <div class="callout callout-info">
+      <span class="callout-title">CLAUDE.md 하나만 만듭니다</span>
+      <p>이 모듈에서 새로 생기는 파일은 프로젝트 루트의 <code>CLAUDE.md</code> 하나입니다. 설정 파일(<code>settings.json</code>)이나 규칙 디렉터리(<code>.claude/rules/</code>)는 만들지 않습니다. <a href="code_basic_05_project-structure.html">다음 모듈 05</a>에서 전체 위치 관계를 먼저 훑고, 실제 설정은 중급 트랙에서 다룹니다.</p>
+    </div>
+  </div>
+
+  <h2>4. 핵심 개념</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+
+    <h3>4-1. 결론부터</h3>
+    <p><strong>Claude Code는 세션이 시작될 때마다 빈 상태로 출발합니다.</strong> 어제 알려 준 것을 오늘은 모릅니다. CLAUDE.md는 <strong>매번 다시 설명하지 않기 위해 적어 두는 파일</strong>이고, Claude가 세션을 시작할 때마다 읽습니다. <span class="src">(출처: code.claude.com/docs/en/memory, 2026-08-26 확인)</span></p>
+
+    <h3>4-2. 기억하는 방법은 두 가지입니다</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th>CLAUDE.md 파일</th><th>자동 메모리 (auto memory)</th></tr></thead>
+        <tbody>
+          <tr><th>누가 쓰는가</th><td>내가</td><td>Claude가</td></tr>
+          <tr><th>무엇이 담기는가</th><td>지시와 규칙</td><td>학습된 것과 패턴</td></tr>
+          <tr><th>범위</th><td>프로젝트, 사용자, 조직</td><td>저장소 단위</td></tr>
+          <tr><th>언제 로드되는가</th><td>모든 세션</td><td>모든 세션 (첫 200줄 또는 25KB)</td></tr>
+          <tr><th>쓰임새</th><td>코딩 표준, 워크플로, 프로젝트 구조</td><td>내 선호, 내가 준 수정 지시, 코드만 봐서는 알 수 없는 프로젝트 맥락</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="code-caption">둘 다 대화 시작 시 함께 로드됩니다. <strong>Claude의 행동을 내가 정하고 싶으면 CLAUDE.md를 쓰고</strong>, 내 수정 사항을 Claude가 알아서 배우게 하려면 자동 메모리에 맡깁니다. 자동 메모리는 기본으로 켜져 있습니다. <span class="src">(출처: code.claude.com/docs/en/memory, 2026-08-26 확인)</span></p>
+
+    <h3>4-3. 어디에 두는가</h3>
+    <p>범위가 넓은 것부터 좁은 것 순으로 로드됩니다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>범위</th><th>위치</th><th>공유 대상</th></tr></thead>
+        <tbody>
+          <tr><th>관리 정책</th><td>OS별 시스템 경로 (IT·DevOps가 배포)</td><td>조직 내 모든 사용자</td></tr>
+          <tr><th>사용자</th><td><code>~/.claude/CLAUDE.md</code></td><td>나 혼자 (모든 프로젝트)</td></tr>
+          <tr><th><strong>프로젝트</strong></th><td><code>./CLAUDE.md</code> 또는 <code>./.claude/CLAUDE.md</code></td><td><strong>버전 관리로 팀 전체</strong></td></tr>
+          <tr><th>로컬</th><td><code>./CLAUDE.local.md</code></td><td>나 혼자 (현재 프로젝트). <code>.gitignore</code>에 추가 필요</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="code-caption">이 모듈에서는 <strong>프로젝트 범위</strong>만 다룹니다. 팀과 공유되는 자리라 실무에서 가장 많이 쓰기 때문입니다. 나머지 세 범위는 중급·상급에서 다룹니다. <span class="src">(출처: code.claude.com/docs/en/memory, 2026-08-26 확인)</span></p>
+
+    <h3>4-4. 무엇을 어떻게 적는가</h3>
+    <p>공식 문서는 <strong>"다시 설명하게 될 것을 적어 두는 자리"</strong>로 설명하며, 아래 네 가지 신호가 오면 CLAUDE.md에 추가하라고 안내합니다. <span class="src">(출처: code.claude.com/docs/en/memory, 2026-08-26 확인)</span></p>
+    <ul>
+      <li>Claude가 <strong>같은 실수를 두 번째</strong> 한다</li>
+      <li>코드 리뷰에서 Claude가 알았어야 할 것이 지적된다</li>
+      <li>지난 세션에 입력했던 <strong>같은 수정 지시를 또</strong> 입력한다</li>
+      <li>새 팀원이 생산적으로 일하려면 <strong>같은 맥락이 필요하다</strong></li>
+    </ul>
+    <p>쓰는 방식은 세 가지가 핵심입니다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>원칙</th><th>내용</th><th>예</th></tr></thead>
+        <tbody>
+          <tr><th>분량</th><td>파일당 <strong>200줄 이하</strong>를 목표로. 길수록 컨텍스트를 많이 먹고 준수도가 떨어집니다</td><td>—</td></tr>
+          <tr><th>구조</th><td>마크다운 제목과 목록으로 묶습니다</td><td>—</td></tr>
+          <tr><th>구체성</th><td><strong>검증 가능할 만큼</strong> 구체적으로</td><td>"코드를 잘 포맷하라" ✕ → "들여쓰기는 공백 2칸" ○<br>"변경을 테스트하라" ✕ → "커밋 전에 <code>npm test</code> 실행" ○</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout callout-warn">
+      <span class="callout-title">서로 모순되는 규칙을 적지 마세요</span>
+      <p>두 규칙이 충돌하면 <strong>Claude가 그중 하나를 임의로 고를 수 있습니다.</strong> 주기적으로 읽어 보며 낡거나 모순된 지시를 지우세요. <span class="src">(출처: code.claude.com/docs/en/memory, 2026-08-26 확인)</span></p>
+    </div>
+
+    <h3>4-5. 강제가 아니라 컨텍스트입니다</h3>
+    <div class="callout callout-danger">
+      <span class="callout-title">가장 중요한 한계</span>
+      <p>CLAUDE.md의 내용은 시스템 프롬프트가 아니라 <strong>시스템 프롬프트 뒤에 오는 사용자 메시지</strong>로 전달됩니다. Claude는 이를 읽고 따르려 하지만 <strong>엄격한 준수가 보장되지는 않습니다.</strong> 특히 모호하거나 서로 충돌하는 지시일수록 그렇습니다. <span class="src">(출처: code.claude.com/docs/en/memory, 2026-08-26 확인)</span></p>
+      <p>즉 <strong>"CLAUDE.md에 적었으니 안전하다"고 생각하면 안 됩니다.</strong> 무슨 일이 있어도 반드시 막아야 하는 동작이라면 CLAUDE.md가 아니라 훅(Hooks)으로 처리해야 하며, 그건 상급 트랙에서 다룹니다. 모듈 02·03에서 배운 <strong>권한 모드와 git 복구 지점은 여전히 필요합니다.</strong></p>
+    </div>
+  </div>
+
+  <h2>5. 단계별 실습</h2>
+
+  <div class="section practice">
+    <span class="section-kind">실습</span>
+
+    <p><strong>만들 결과물:</strong> 프로젝트 루트에 커밋된 <code>CLAUDE.md</code> 파일 1개.</p>
+
+    <ol class="steps">
+
+      <li>
+        <span class="step-title">샌드박스 상태를 확인합니다</span>
+        <div class="code-label">셸 명령 · 예상 출력</div>
+<pre><code>$ cd ~/claude-code-sandbox
+$ git log --oneline
+a1b2c3d feat: 재고 기준값을 명령줄 인자로 받도록 변경
+0b3f2cd chore: 샌드박스 초기 상태
+
+$ git status
+On branch main
+nothing to commit, working tree clean</code></pre>
+        <p class="code-caption">커밋 해시와 메시지 문구, <strong>브랜치 이름(<code>main</code> 또는 <code>master</code>)</strong>은 환경마다 다릅니다. <code>init.defaultBranch</code>를 설정하지 않은 환경에서는 <code>master</code>로 나옵니다. <strong>커밋이 2개이고 작업 트리가 깨끗한지</strong>가 확인 기준입니다. <span class="src">(CLI 실행 결과 직접 확인, 2026-08-26)</span></p>
+        <p>커밋이 2개이고 작업 트리가 깨끗해야 합니다. 모듈 03을 마치지 않았다면 먼저 완료하세요.</p>
+      </li>
+
+      <li>
+        <span class="step-title">Claude Code를 시작하고 Manual 모드로 맞춥니다</span>
+        <p><code>claude</code>로 세션을 열고 상태 표시줄이 <code>⏸ manual mode on</code>이 되도록 조정합니다. 이 모듈도 파일을 만들므로 승인 화면을 직접 봅니다.</p>
+      </li>
+
+      <li>
+        <span class="step-title">지금 무엇이 로드돼 있는지 먼저 봅니다</span>
+        <p>아래를 입력하고 <strong>Memory files</strong> 항목을 확인합니다. 아직 CLAUDE.md를 만들지 않았으므로 <strong>목록이 비어 있거나 프로젝트 파일이 없어야 정상</strong>입니다. 이것이 8단계와 비교할 대조군입니다.</p>
+        <div class="code-label">세션 커맨드</div>
+<pre><code>/context</code></pre>
+      </li>
+
+      <li>
+        <span class="step-title">/init으로 초안을 만듭니다</span>
+        <p>아래를 입력합니다. Claude가 코드베이스를 분석해 빌드 명령·테스트 방법·프로젝트 관례가 담긴 CLAUDE.md 초안을 만듭니다.</p>
+        <div class="code-label">세션 커맨드</div>
+<pre><code>/init</code></pre>
+        <div class="callout callout-tip">
+          <span class="callout-title">이미 CLAUDE.md가 있어도 안전합니다</span>
+          <p>파일이 이미 있으면 <code>/init</code>은 <strong>덮어쓰지 않고 개선안을 제안</strong>합니다. <span class="src">(출처: code.claude.com/docs/en/memory, 2026-08-26 확인)</span></p>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">생성 내용을 검토하고 승인합니다</span>
+        <p>모듈 03과 같은 승인 화면이 나옵니다. <strong>내용을 읽고</strong> 승인하세요. 여기서도 "Yes, and don't ask again"은 고르지 않습니다.</p>
+
+        <div class="capture">
+          <div class="capture-head">[캡처 C-01]</div>
+          <dl>
+            <dt>화면</dt><dd><code>/init</code>이 제시한 CLAUDE.md 내용과 승인 프롬프트</dd>
+            <dt>진입 경로</dt><dd>세션에서 <code>/init</code> 실행 후 파일 생성 제시 시점</dd>
+            <dt>캡처 범위</dt><dd>생성될 내용 앞부분과 선택지가 함께 보이는 범위</dd>
+            <dt>강조 표시</dt><dd>없음</dd>
+            <dt>캡션</dt><dd>/init은 코드베이스를 분석해 CLAUDE.md 초안을 만든다. 승인 전에 내용을 읽는다.</dd>
+          </dl>
+        </div>
+        <!-- SCREENSHOT: C-01 /init 생성 내용과 승인 프롬프트 (근사 목업 — 내용은 실제 실행 결과) -->
+        <div class="mock-note"><b>근사 목업</b> 실제 화면과 다를 수 있는 근사 목업입니다. 승인 화면 자체는 로그인을 마친 대화형 세션에서만 나타나 이 환경에서는 캡처하지 못했습니다. 게다가 이 커리큘럼 제작 환경은 <code>/init</code> 스킬 자체가 운영 정책(<code>skillOverrides</code>)으로 비활성화되어 있어(<code>claude -p "/init"</code> 실행 시 <code>Skill "init" is disabled via skillOverrides.</code>라는 실제 응답을 받았습니다) 진짜 <code>/init</code>을 실행하지도 못했습니다. 아래 내용은 같은 샌드박스에서 "/init과 같은 취지로 CLAUDE.md를 작성해 달라"는 동등한 프롬프트를 <code>claude -p</code>로 실제 실행해 받은 결과이며, 실제 <code>/init</code> 출력과 항목 구성·문구가 다를 수 있습니다. <strong>이 내용은 실행마다 달라질 수 있는 응답 예시입니다.</strong></div>
+        <div class="tui">
+          <div class="tui-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp;Terminal — claude</div>
+          <pre class="tui-body"> <span class="accent">Write(CLAUDE.md)</span>
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+  1  # CLAUDE.md
+  2
+  3  ## 프로젝트 개요
+  4  재고 CSV(inventory.csv)를 읽어 수량이 기준치(기본 10)
+  5  미만인 품목의 재고 부족 알림 문구를 콘솔에 출력하는
+  6  사내 교육용 샌드박스 CLI 도구. 외부 의존성 없이 Python
+  7  표준 라이브러리만 사용한다.
+  8
+  9  ## 구조
+ 10  - app.py — 진입점. CSV 로드, 기준치 필터링, 출력.
+ 11  - utils/formatter.py — build_alert(item): 알림 문구 포맷팅.
+     <span class="dim">… (17줄 더 — 실행 방법·코드 컨벤션)</span>
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ <span class="dim">Do you want to create CLAUDE.md?</span>
+
+ <span class="dim">❯</span> 1. Yes
+   <span class="hl">2. Yes, and don't ask again</span>
+   3. No</pre>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">만들어진 파일을 직접 열어 읽습니다</span>
+        <p>터미널을 따로 열어 확인합니다. <strong>Claude가 무엇을 알아냈는지, 무엇을 놓쳤는지</strong>를 직접 판단하는 단계입니다.</p>
+        <div class="code-label">셸 명령</div>
+<pre><code>cat CLAUDE.md
+wc -l CLAUDE.md</code></pre>
+        <p class="code-caption">줄 수가 200줄을 넘으면 4-4의 분량 기준을 넘은 것입니다. 이 샌드박스는 파일이 5개뿐이라 보통 훨씬 짧게 나옵니다.</p>
+
+        <div class="checkpoint">
+          <span class="checkpoint-title">여기까지 — CLAUDE.md 생성</span>
+          <ul>
+            <li>프로젝트 루트에 <code>CLAUDE.md</code>가 생겼다</li>
+            <li>내용을 직접 열어 읽었고, 무엇이 적혀 있는지 말할 수 있다</li>
+            <li>줄 수가 200줄 이하다</li>
+          </ul>
+          <p>파일이 안 생겼다면 5단계에서 승인하지 않았을 가능성이 큽니다. 7번 절을 확인한 뒤 4단계부터 다시 하세요.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">이 프로젝트만의 규칙을 추가합니다 (프롬프트 A)</span>
+        <p><code>/init</code>은 코드에서 읽어낼 수 있는 것만 씁니다. <strong>코드만 봐서는 알 수 없는 규칙</strong>은 내가 직접 알려 줘야 합니다. 세션에서 아래를 보냅니다.</p>
+        <div class="code-label">프롬프트</div>
+<pre><code>CLAUDE.md에 아래 규칙을 추가해 주세요.
+
+## 이 프로젝트의 규칙
+- utils/formatter.py의 출력 문구 형식은 바꾸지 않는다. 다른 시스템이 이 형식을 파싱한다.
+- 변경 후에는 반드시 `python3 app.py inventory.csv`를 실행해 결과를 확인한다.
+- 커밋은 사용자가 요청할 때만 한다.</code></pre>
+      </li>
+
+      <li>
+        <span class="step-title">/context로 실제 로드를 확인합니다</span>
+        <p>다시 입력하고 <strong>Memory files</strong> 목록에 <code>CLAUDE.md</code>가 나타나는지 봅니다. 3단계와 비교하세요.</p>
+        <div class="code-label">세션 커맨드</div>
+<pre><code>/context</code></pre>
+        <p><strong>이 목록에 없으면 Claude는 그 파일을 보지 못하고 있는 것입니다.</strong> 파일을 만들었다는 것과 로드됐다는 것은 다릅니다.</p>
+
+        <div class="capture">
+          <div class="capture-head">[캡처 C-02]</div>
+          <dl>
+            <dt>화면</dt><dd><code>/context</code>의 Memory files 목록</dd>
+            <dt>진입 경로</dt><dd>세션에서 <code>/context</code> 실행</dd>
+            <dt>캡처 범위</dt><dd>Memory files 항목이 보이는 범위</dd>
+            <dt>강조 표시</dt><dd>목록에 나타난 <code>CLAUDE.md</code>(빨간 테두리)</dd>
+            <dt>캡션</dt><dd>파일을 만든 것과 로드된 것은 다르다. /context의 Memory files로 확인한다.</dd>
+          </dl>
+        </div>
+        <!-- SCREENSHOT: C-02 /context의 Memory files 목록 (근사 목업 — 로드 여부는 실제 실행 결과) -->
+        <div class="mock-note"><b>근사 목업</b> 실제 화면과 다를 수 있는 근사 목업입니다. 공식 명령어 문서는 <code>/context</code>를 "색으로 구분된 그리드(colored grid)" 시각화로 설명하는데, 이 그리드 배치는 대화형 화면에서만 나타나 이 환경에서는 재현하지 못했습니다. 대신 같은 샌드박스에서 <code>claude -p "/context"</code>를 CLAUDE.md 생성 전·후로 각각 실제 실행했고, 생성 후에만 <strong><code>Memory files</code> 항목(628토큰)이 새로 나타나는 것</strong>을 직접 확인했습니다. 아래는 그 결과를 이 모듈이 다루는 프로젝트·사용자 범위 목록 형태로 재구성한 것이며, 실제 그리드 화면의 배치·색상과는 다릅니다.</div>
+        <div class="tui">
+          <div class="tui-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp;Terminal — claude</div>
+          <pre class="tui-body">&gt; /context
+
+ Model: claude-sonnet-5        Tokens: 40.9k / 500k (8%)
+
+ <span class="accent">Memory files</span>
+ <span class="hl">✔ Project   ./CLAUDE.md          (628 tokens)</span>
+   User      ~/.claude/CLAUDE.md   (없음)
+   Local     ./CLAUDE.local.md     (없음)
+
+ <span class="dim">System prompt · System tools · Skills · Messages · Free space …</span></pre>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">규칙이 실제로 전달됐는지 확인합니다 (프롬프트 B)</span>
+        <div class="code-label">프롬프트</div>
+<pre><code>이 프로젝트에서 내가 지키라고 한 규칙을 정리해서 알려 주세요.</code></pre>
+        <p>7단계에서 적은 세 항목이 답에 나타나야 합니다. 나타나지 않으면 파일이 로드되지 않았거나 내용이 저장되지 않은 것입니다.</p>
+
+        <div class="checkpoint">
+          <span class="checkpoint-title">여기까지 — 로드와 반영 확인</span>
+          <ul>
+            <li><code>/context</code>의 Memory files에 <code>CLAUDE.md</code>가 보인다</li>
+            <li>내가 추가한 규칙 3개가 응답에 나타난다</li>
+            <li>3단계(추가 전)와 8단계(추가 후)의 차이를 설명할 수 있다</li>
+          </ul>
+          <p>규칙이 응답에 안 나오면 <code>cat CLAUDE.md</code>로 파일에 실제로 적혔는지부터 확인하세요. 파일에 있는데 응답에 없다면 4-5에서 본 대로 <strong>CLAUDE.md는 강제가 아니라 컨텍스트</strong>라는 점을 기억하고, 규칙을 더 구체적으로 다시 써 봅니다.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">/memory로 메모리 파일 위치를 봅니다</span>
+        <p>아래를 입력하면 CLAUDE.md와 그 밖의 메모리 파일 위치가 사용자·프로젝트 범위별로 나열됩니다. 자동 메모리를 켜고 끄는 토글과 자동 메모리 폴더를 여는 항목도 여기 있습니다. <strong>지금은 목록만 확인하고 아무것도 바꾸지 않습니다.</strong></p>
+        <div class="code-label">세션 커맨드</div>
+<pre><code>/memory</code></pre>
+
+        <div class="capture">
+          <div class="capture-head">[캡처 C-03]</div>
+          <dl>
+            <dt>화면</dt><dd><code>/memory</code> 목록</dd>
+            <dt>진입 경로</dt><dd>세션에서 <code>/memory</code> 실행</dd>
+            <dt>캡처 범위</dt><dd>파일 목록과 자동 메모리 토글이 함께 보이는 범위</dd>
+            <dt>강조 표시</dt><dd>자동 메모리 토글(빨간 테두리 — 이 모듈에서는 바꾸지 않음)</dd>
+            <dt>캡션</dt><dd>/memory는 메모리 파일 위치를 보여 준다. 실제 로드 여부는 /context로 확인한다.</dd>
+          </dl>
+        </div>
+        <!-- SCREENSHOT: C-03 /memory 목록 (근사 목업) -->
+        <div class="mock-note"><b>근사 목업</b> 실제 화면과 다를 수 있는 근사 목업입니다. <code>/memory</code>는 대화형 선택 UI를 여는 커맨드라, 이 환경에서 <code>claude -p "/memory"</code>로 시도하면 <code>&quot;/memory&quot; isn't available in this environment.</code>라는 실제 응답만 돌아옵니다(로그인을 마치지 못해 대화형 화면 자체를 열 수 없기 때문입니다). 파일 위치 목록은 본문 4-3 표에서 공식 Memory 문서로 확인한 범위·경로를 그대로 옮겼습니다. <span class="src">사용자 범위 경로는 예시이며, 실제 캡처로 교체할 때는 계정명이 그대로 노출되지 않는지 확인하세요.</span></div>
+        <div class="tui">
+          <div class="tui-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp;Terminal — claude</div>
+          <pre class="tui-body">&gt; /memory
+
+ <span class="accent">Memory files</span>
+
+   Managed policy   (조직 관리 정책 없음)
+   User             ~/.claude/CLAUDE.md        없음
+   <span class="hl">Project          ./CLAUDE.md               있음</span>
+   Local            ./CLAUDE.local.md          없음
+
+ <span class="hl">Auto memory: ON</span>   <span class="dim">(자동 메모리 폴더 열기 / 끄기)</span></pre>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">CLAUDE.md를 커밋합니다 (프롬프트 C)</span>
+        <p>프로젝트 범위의 CLAUDE.md는 <strong>버전 관리로 팀과 공유</strong>되는 파일입니다. 커밋해야 의미가 있습니다.</p>
+        <div class="code-label">프롬프트</div>
+<pre><code>CLAUDE.md를 커밋해 주세요.
+커밋 메시지는 이 파일이 무엇인지 한 줄로 설명해 주세요.</code></pre>
+      </li>
+
+      <li>
+        <span class="step-title">커밋을 확인하고 마칩니다</span>
+        <div class="code-label">셸 명령 · 예상 출력</div>
+<pre><code>$ git log --oneline
+d4e5f6a docs: 프로젝트 지침 CLAUDE.md 추가
+a1b2c3d feat: 재고 기준값을 명령줄 인자로 받도록 변경
+0b3f2cd chore: 샌드박스 초기 상태
+
+$ git status
+On branch main
+nothing to commit, working tree clean</code></pre>
+        <p class="code-caption">여기서도 커밋 해시·메시지 문구·<strong>브랜치 이름(<code>main</code> 또는 <code>master</code>)</strong>은 환경마다 다릅니다. <span class="src">(CLI 실행 결과 직접 확인, 2026-08-26)</span></p>
+        <p>커밋이 3개가 되고 작업 트리가 깨끗하면 완료입니다. <code>/exit</code>으로 종료합니다.</p>
+      </li>
+
+    </ol>
+  </div>
+
+  <h2>6. 예제 코드·예제 프롬프트</h2>
+
+  <div class="section practice">
+    <span class="section-kind">실습 자료</span>
+
+    <div class="callout callout-info">
+      <span class="callout-title">/init 결과는 매번 다릅니다</span>
+      <p><code>/init</code>이 만드는 CLAUDE.md의 항목 구성과 문구는 실행할 때마다 달라집니다. 성공 확인 기준은 문구가 아니라 <strong>파일이 생겼는지, 로드됐는지, 내가 추가한 규칙이 반영됐는지</strong>입니다.</p>
+    </div>
+
+    <h3 id="prompt-a">프롬프트 A — 프로젝트 규칙 추가</h3>
+    <p><strong>사전 준비물:</strong> <code>/init</code>으로 CLAUDE.md가 생성된 상태의 세션, Manual 모드.</p>
+    <div class="code-label">실행할 프롬프트 전문</div>
+<pre><code>CLAUDE.md에 아래 규칙을 추가해 주세요.
+
+## 이 프로젝트의 규칙
+- utils/formatter.py의 출력 문구 형식은 바꾸지 않는다. 다른 시스템이 이 형식을 파싱한다.
+- 변경 후에는 반드시 `python3 app.py inventory.csv`를 실행해 결과를 확인한다.
+- 커밋은 사용자가 요청할 때만 한다.</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> CLAUDE.md 수정 승인을 묻고, 승인하면 해당 절이 추가됩니다.</p>
+    <p><strong>성공 확인 방법:</strong> 터미널에서 <code>cat CLAUDE.md</code>를 실행해 세 항목이 파일에 실제로 들어갔는지 확인합니다. 화면에서 "추가했다"고 한 것만으로는 확인이 아닙니다.</p>
+    <p class="code-caption">이 세 규칙은 <strong>코드만 봐서는 알 수 없는 것</strong>들입니다. 그래서 <code>/init</code>이 자동으로 넣어 주지 못하고 내가 알려 줘야 합니다. 실제 프로젝트에서도 CLAUDE.md의 진짜 가치는 이런 항목에서 나옵니다.</p>
+
+    <h3 id="prompt-b">프롬프트 B — 규칙 전달 확인</h3>
+    <p><strong>사전 준비물:</strong> 프롬프트 A를 마친 <strong>같은 세션</strong>, <code>/context</code>에서 CLAUDE.md가 확인된 상태.</p>
+    <div class="code-label">실행할 프롬프트 전문</div>
+<pre><code>이 프로젝트에서 내가 지키라고 한 규칙을 정리해서 알려 주세요.</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> CLAUDE.md에 적힌 규칙들이 정리되어 나옵니다. 문구는 파일과 똑같지 않을 수 있습니다.</p>
+    <p><strong>성공 확인 방법:</strong> 아래 3가지가 응답에 <strong>내용상</strong> 담겨 있으면 성공입니다.</p>
+    <ul class="checklist">
+      <li><input type="checkbox" id="b1"><label for="b1">formatter의 출력 형식을 바꾸지 말라는 내용</label></li>
+      <li><input type="checkbox" id="b2"><label for="b2">변경 후 실행해 확인하라는 내용</label></li>
+      <li><input type="checkbox" id="b3"><label for="b3">커밋은 요청 시에만 하라는 내용</label></li>
+    </ul>
+
+    <h3 id="prompt-c">프롬프트 C — CLAUDE.md 커밋</h3>
+    <p><strong>사전 준비물:</strong> 프롬프트 B까지 마친 <strong>같은 세션</strong>.</p>
+    <div class="code-label">실행할 프롬프트 전문</div>
+<pre><code>CLAUDE.md를 커밋해 주세요.
+커밋 메시지는 이 파일이 무엇인지 한 줄로 설명해 주세요.</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> 커밋 메시지 초안과 함께 실행 승인을 묻고, 승인하면 커밋됩니다.</p>
+    <p><strong>성공 확인 방법:</strong> <code>git log --oneline</code>에 커밋이 <strong>3개</strong>이고 <code>git status</code>가 <code>nothing to commit</code>이면 성공입니다.</p>
+  </div>
+
+  <h2>7. 트러블슈팅</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>증상</th><th>원인</th><th>해결</th></tr></thead>
+        <tbody>
+          <tr>
+            <th><code>/init</code>을 돌렸는데 파일이 안 생겼다</th>
+            <td>승인 화면에서 승인하지 않음</td>
+            <td>Manual 모드에서는 파일 생성도 승인이 필요합니다. <code>/init</code>을 다시 실행하고 승인하세요.</td>
+          </tr>
+          <tr>
+            <th><code>/context</code>의 Memory files에 CLAUDE.md가 없다</th>
+            <td>로드되는 위치에 파일이 없음</td>
+            <td>프로젝트 루트(<code>./CLAUDE.md</code>) 또는 <code>./.claude/CLAUDE.md</code>에 있는지 확인합니다. <code>pwd</code>로 세션의 작업 디렉터리가 샌드박스인지도 함께 확인하세요.</td>
+          </tr>
+          <tr>
+            <th>CLAUDE.md에 적었는데 Claude가 안 지킨다</th>
+            <td>CLAUDE.md는 강제가 아니라 컨텍스트 (4-5)</td>
+            <td>먼저 <code>/context</code>로 로드 여부를 확인합니다. 로드됐다면 지시를 더 구체적으로 바꾸고("포맷을 잘 하라" → "들여쓰기는 공백 2칸"), 서로 충돌하는 지시가 있는지 살펴봅니다.</td>
+          </tr>
+          <tr>
+            <th>CLAUDE.md가 너무 길어졌다</th>
+            <td>200줄 기준 초과</td>
+            <td>세션마다 컨텍스트를 더 먹고 준수도가 떨어집니다. 매 세션 필요하지 않은 내용을 덜어내세요. 파일을 쪼개 특정 경로에서만 로드되게 하는 방법은 중급에서 다룹니다.</td>
+          </tr>
+          <tr>
+            <th>기억해 달라고 했더니 CLAUDE.md가 아닌 곳에 저장됐다</th>
+            <td>자동 메모리에 저장됨</td>
+            <td>정상 동작입니다. CLAUDE.md에 넣고 싶으면 <strong>"이걸 CLAUDE.md에 추가해 줘"</strong>라고 명시적으로 요청하세요. <span class="src">(출처: code.claude.com/docs/en/memory, 2026-08-26 확인)</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>8. 확인 체크리스트</h2>
+
+  <div class="section">
+    <span class="section-kind">자가 점검</span>
+    <p>이 모듈로 Claude Code 초급 코스가 끝납니다. 아래를 확인한 뒤 중급 트랙으로 넘어가세요.</p>
+    <ul class="checklist">
+      <li><input type="checkbox" id="c1"><label for="c1">CLAUDE.md를 프로젝트 루트에 두면 팀과 공유된다는 점을 안다.</label></li>
+      <li><input type="checkbox" id="c2"><label for="c2"><code>/init</code>으로 초안을 만들고 직접 읽어 봤다.</label></li>
+      <li><input type="checkbox" id="c3"><label for="c3">코드만 봐서는 알 수 없는 규칙을 내가 추가해야 한다는 점을 안다.</label></li>
+      <li><input type="checkbox" id="c4"><label for="c4"><code>/context</code>로 실제 로드 여부를 확인할 수 있다.</label></li>
+      <li><input type="checkbox" id="c5"><label for="c5">CLAUDE.md가 강제가 아니라 컨텍스트이며, 권한 모드와 git 복구 지점이 여전히 필요하다는 점을 안다.</label></li>
+    </ul>
+  </div>
+
+  <h2>9. 필요 캡처 목록</h2>
+
+  <div class="section">
+    <span class="section-kind">작성자용</span>
+    <p>이 모듈에는 캡처 3장이 필요합니다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>번호</th><th>화면</th><th>진입 경로</th><th>캡처 범위</th><th>강조 표시</th><th>캡션</th></tr></thead>
+        <tbody>
+          <tr><td class="mod-no">C-01</td><td><code>/init</code> 생성 내용과 승인 프롬프트</td><td>세션에서 <code>/init</code> 실행 후</td><td>생성될 내용 앞부분과 선택지</td><td>없음</td><td>/init은 코드베이스를 분석해 초안을 만든다. 승인 전에 내용을 읽는다.</td></tr>
+          <tr><td class="mod-no">C-02</td><td><code>/context</code>의 Memory files 목록</td><td>세션에서 <code>/context</code> 실행</td><td>Memory files 항목이 보이는 범위</td><td>목록의 <code>CLAUDE.md</code></td><td>파일을 만든 것과 로드된 것은 다르다. /context로 확인한다.</td></tr>
+          <tr><td class="mod-no">C-03</td><td><code>/memory</code> 목록</td><td>세션에서 <code>/memory</code> 실행</td><td>파일 목록과 자동 메모리 토글</td><td>자동 메모리 토글</td><td>/memory는 메모리 파일 위치를 보여 준다. 실제 로드 여부는 /context로 확인한다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout callout-warn">
+      <span class="callout-title">캡처 시 주의</span>
+      <p>목록에 <code>CLAUDE.md</code>가 나타나려면 파일이 <strong>존재하기만 하면 됩니다</strong> — 4단계(<code>/init</code>)에서 파일이 생기는 즉시 나타나며, 같은 세션 안에서 곧바로 반영됩니다. 7단계(규칙 추가)는 파일 <strong>내용</strong>을 바꿀 뿐 목록 노출 여부와는 무관합니다. 이 문서의 실습 흐름상 C-02는 8단계에서 찍으므로 항상 나타난 상태입니다. 3단계(생성 전)와 8단계(생성 후)를 <strong>둘 다 찍어 비교</strong>로 쓰면 이해가 훨씬 빨라집니다 — 그 경우 캡처를 4장으로 늘리고 이 목록을 갱신하세요. C-03에는 사용자 범위 경로(<code>~/.claude/</code>)가 표시되므로 계정명이 노출될 수 있습니다. <span class="src">(CLI 실행 결과 직접 확인, 2026-08-26 — 같은 세션 안에서 파일 생성 직후 <code>/context</code>로 즉시 반영됨을 재현)</span></p>
+    </div>
+  </div>
+
+  <h2>10. 참고 자료</h2>
+
+  <ul class="reflist">
+    <li>How Claude remembers your project (Claude Code Docs) — <code>https://code.claude.com/docs/en/memory</code> <span class="ref-date">2026-08-26 확인</span></li>
+    <li>CLI 실행 결과 직접 확인 — 모듈 01의 샌드박스 생성 스크립트로 동일한 환경을 재현하고 모듈 03의 변경을 재현한 뒤, <code>claude</code> CLI(v2.1.246, Linux, <code>--print</code> 비대화 모드)로 이 문서의 실습 흐름을 재현. CLAUDE.md를 프로젝트 루트에 생성한 뒤 <strong>별도의 새 세션</strong>에서 그 안에 적은 규칙(가상의 프로젝트 규칙 포함)을 되묻는 프롬프트로 실제 반영 여부 확인, <code>/context</code>의 <strong>Memory Files</strong> 표에 CLAUDE.md 생성 전후 차이(User·Project·Local 세 범위가 함께 표시되고 서로 다른 파일의 내용이 한 응답에 동시에 반영됨) 확인, 같은 세션 안에서 파일을 만든 직후 <code>/context</code>로 즉시 목록에 반영되는지 확인, <code>git init</code> 직후 브랜치 이름이 <code>master</code>로 생성됨을 재현. <code>/init</code>은 이 샌드박스 환경 자체의 운영 정책으로 비활성화되어 있어 직접 실행하지 못했고, <code>/memory</code>는 대화형 선택 UI를 열기 때문에 비대화 모드에서는 <code>&quot;/memory&quot; isn't available in this environment</code>로 응답해 직접 실행하지 못했다 — 이 두 항목은 공식 문서 문구와 대조하는 방식으로 확인했다 <span class="ref-date">2026-08-26 확인</span></li>
+    <li>Built-in slash commands (Claude Code Docs) — <code>https://code.claude.com/docs/en/commands</code> <span class="ref-date">2026-08-27 확인</span> (<code>/context</code>가 "colored grid" 시각화임을 확인)</li>
+    <li>캡처 C-01~C-03 목업 제작을 위한 CLI 실행 결과 직접 확인 — 동일한 샌드박스를 다시 재현해 <code>claude -p "/init"</code>이 여전히 <code>Skill "init" is disabled via skillOverrides.</code>로 거부됨을 재확인, <code>/init</code>과 같은 취지의 프롬프트로 CLAUDE.md를 실제 생성, <code>claude -p "/context"</code>를 생성 전·후로 각각 실행해 <code>Memory files</code> 행이 새로 나타남을 재확인, <code>claude -p "/memory"</code>가 여전히 <code>&quot;/memory&quot; isn't available in this environment.</code>로 응답함을 재확인 (네이티브 설치, v2.1.247, Linux) <span class="ref-date">2026-08-27 확인</span></li>
+  </ul>
+
+  <div class="callout callout-info">
+    <span class="callout-title">사실 확인 기준</span>
+    <p>CLAUDE.md의 네 가지 범위와 로드 순서, <code>/init</code>·<code>/memory</code>의 동작, 200줄 기준과 구체성 원칙, 자동 메모리의 기본 활성 상태, 그리고 "시스템 프롬프트가 아니라 사용자 메시지로 전달되어 엄격한 준수가 보장되지 않는다"는 한계를 모두 공식 메모리 문서로 다시 대조했습니다. <code>/context</code>의 Memory Files 표시(생성 전 비어 있음 → 생성 직후 즉시 표시, User·Project·Local 동시 표시)와 CLAUDE.md에 적은 규칙이 실제로 응답에 반영되는지는 위 CLI 실행으로 <strong>직접 재현</strong>했습니다. 이번 대조에서 <strong>자동 메모리의 "쓰임새" 설명이 공식 문서와 달랐던 것</strong>(기존: "빌드 명령, 디버깅 통찰, Claude가 알아낸 선호" → 문서상 실제로는 "내 선호, 내가 준 수정 사항, 코드에서 유추할 수 없는 프로젝트 맥락"이며 "빌드 명령"은 오히려 CLAUDE.md 쪽 설명입니다)을 발견해 4-2 표를 고쳤고, <code>git init</code> 직후 브랜치 이름이 <code>init.defaultBranch</code> 미설정 환경에서 <code>main</code>이 아니라 <code>master</code>로 생성됨을 확인해 1·12단계 예시에 안내를 추가했습니다(모듈 01·03과 동일한 방식). 9절의 C-02 캡처 안내도 "7단계 이후"라는 인과관계가 부정확해 "4단계(<code>/init</code>)에서 파일이 생기는 즉시"로 바로잡았습니다. 초급 범위를 넘는 항목(<code>.claude/rules/</code>, 경로별 규칙, <code>@path</code> 임포트, 조직 배포용 관리 정책, <code>claudeMdExcludes</code>)은 같은 문서에서 확인했으나 다루지 않았습니다.</p>
+    <p>2026-08-27에는 C-01~C-03의 화면 목업을 만들면서 같은 확인을 반복해 위 두 제약(<code>/init</code> 비활성화, <code>/memory</code> 비대화 모드 미지원)이 오늘도 그대로임을 재확인했습니다. 공식 Slash commands 문서에서 <code>/context</code>가 실제로는 "색으로 구분된 그리드(colored grid)"로 시각화된다는 것을 추가로 확인해, C-02 목업에 그 배치가 실제 화면과 다를 수 있다는 점을 명시했습니다. C-01의 CLAUDE.md 내용과 C-02의 <code>Memory files</code> 표시는 이때 실제로 생성·확인한 결과를 옮긴 것입니다. 대화형 승인 화면·<code>/context</code> 그리드·<code>/memory</code> 목록 UI 자체는 로그인을 마쳐야 나타나는데, 이 클라우드 환경에는 연결된 브라우저가 없어 세 캡처 모두 근사 목업으로 대체했습니다.</p>
+  </div>
+
+  <div class="doc-footer">
+    <span>Claude Code · 초급 · 모듈 04 (code_basic_04_claude-md.html)</span>
+    <span class="checked-date">최종 확인일: 2026-08-26</span>
+  </div>
+
+</div>
+</div><!-- /.layout -->
+
+<script>
+(function(){
+  var COURSES = [{"id":"claude-basic","product":"Claude","track":"basic","trackLabel":"초급","status":"done","modules":[{"no":"01","file":"claude_basic_01_first-chat.html","title":"접속과 첫 대화, 프롬프트 기초"},{"no":"02","file":"claude_basic_02_interface-and-chats.html","title":"화면 구성과 대화 관리"},{"no":"03","file":"claude_basic_03_file-upload.html","title":"파일 업로드로 문서 질의하기"},{"no":"04","file":"claude_basic_04_model-and-effort.html","title":"모델 선택과 응답 조절"},{"no":"05","file":"claude_basic_05_artifacts.html","title":"아티팩트로 결과물 만들고 내보내기"}]},{"id":"cowork-basic","product":"Claude Cowork","track":"basic","trackLabel":"초급","status":"todo","modules":[]},{"id":"code-basic","product":"Claude Code","track":"basic","trackLabel":"초급","status":"done","modules":[{"no":"01","file":"code_basic_01_install-and-first-session.html","title":"설치와 첫 세션"},{"no":"02","file":"code_basic_02_permissions-and-safety.html","title":"권한 모드와 안전장치"},{"no":"03","file":"code_basic_03_first-change-and-commit.html","title":"첫 코드 변경과 커밋"},{"no":"04","file":"code_basic_04_claude-md.html","title":"CLAUDE.md로 프로젝트 컨텍스트 남기기"},{"no":"05","file":"code_basic_05_project-structure.html","title":"Claude Code 폴더 구조 총정리"}]},{"id":"design-basic","product":"Claude Design","track":"basic","trackLabel":"초급","status":"todo","modules":[]},{"id":"claude-custom","product":"Claude","track":"custom","trackLabel":"중급","status":"done","modules":[{"no":"01","file":"claude_custom_01_instructions.html","title":"계정 전체 지침으로 반복 설명 없애기"},{"no":"02","file":"claude_custom_02_skills.html","title":"스킬(Skills)로 응답 방식과 반복 작업 저장하기"},{"no":"03","file":"claude_custom_03_projects.html","title":"프로젝트로 작업 공간 꾸리기"},{"no":"04","file":"claude_custom_04_connectors.html","title":"커넥터로 외부 도구 연결하기"},{"no":"05","file":"claude_custom_05_memory.html","title":"메모리와 이전 대화 활용하기"}]},{"id":"cowork-custom","product":"Claude Cowork","track":"custom","trackLabel":"중급","status":"todo","modules":[]},{"id":"code-custom","product":"Claude Code","track":"custom","trackLabel":"중급","status":"done","modules":[{"no":"01","file":"code_custom_01_codebase-recon.html","title":"기존 코드베이스 파악하기"},{"no":"02","file":"code_custom_02_settings-json.html","title":"settings.json으로 반복 승인 정리하기"},{"no":"03","file":"code_custom_03_skills.html","title":"스킬(Skills)로 반복 작업 저장하기"},{"no":"04","file":"code_custom_04_review-workflow.html","title":"코드 리뷰 워크플로 만들기"},{"no":"05","file":"code_custom_05_mcp.html","title":"MCP로 외부 도구 연결하기"}]},{"id":"design-custom","product":"Claude Design","track":"custom","trackLabel":"중급","status":"todo","modules":[]},{"id":"claude-advanced","product":"Claude","track":"advanced","trackLabel":"상급","status":"done","modules":[{"no":"01","file":"claude_advanced_01_structured-prompts.html","title":"구조화된 프롬프트 설계"},{"no":"02","file":"claude_advanced_02_examples-and-thinking.html","title":"예시와 사고 유도로 일관성 높이기"},{"no":"03","file":"claude_advanced_03_prompt-assets.html","title":"프롬프트를 재사용 자산으로 만들기"},{"no":"04","file":"claude_advanced_04_org-rollout.html","title":"조직 표준 배포 설계"}]},{"id":"cowork-advanced","product":"Claude Cowork","track":"advanced","trackLabel":"상급","status":"todo","modules":[]},{"id":"code-advanced","product":"Claude Code","track":"advanced","trackLabel":"상급","status":"done","modules":[{"no":"01","file":"code_advanced_01_hooks-guard.html","title":"훅으로 위험 경로 차단하기"},{"no":"02","file":"code_advanced_02_safety-net.html","title":"변경 안전망 — 현재 동작 박제와 자동 검증"},{"no":"03","file":"code_advanced_03_subagents.html","title":"서브에이전트로 컨텍스트와 권한 분리하기"},{"no":"04","file":"code_advanced_04_handover-system.html","title":"세션 인계 체계 운용하기"},{"no":"05","file":"code_advanced_05_automation-rollout.html","title":"무인 실행과 조직 표준 배포"}]},{"id":"design-advanced","product":"Claude Design","track":"advanced","trackLabel":"상급","status":"todo","modules":[]}];
+
+  var STATUS_LABEL = {done:'완료', writing:'작성 중', planned:'분할 확정', todo:'미착수'};
+  var currentFile = location.pathname.split('/').pop() || 'index.html';
+
+  var nav = document.getElementById('sidebarNav');
+  if(!nav) return;
+
+  /* 코스 아코디언 펼침 상태: 페이지를 이동해도 "지금 보는 모듈의 코스"를
+     자동으로 펼치지 않는다 — 오직 사용자가 직접 펼치거나 접은 이력만
+     기억한다. 아무 것도 편 적이 없으면 전부 접힌 채로 시작한다. */
+  var OPEN_STORAGE_KEY = 'curriculum-sidebar-open-courses';
+
+  function readOpenCourseIds(){
+    try{
+      var raw = window.localStorage.getItem(OPEN_STORAGE_KEY);
+      if(!raw) return [];
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    }catch(e){ return []; }
+  }
+  function writeOpenCourseIds(ids){
+    try{ window.localStorage.setItem(OPEN_STORAGE_KEY, JSON.stringify(ids)); }catch(e){}
+  }
+
+  var openCourseIds = readOpenCourseIds();
+
+  var html = '';
+  COURSES.forEach(function(course){
+    var isOpen = openCourseIds.indexOf(course.id) !== -1;
+    html += '<div class="sb-course' + (isOpen ? ' open' : '') + '" data-course="' + course.id + '">';
+    html += '<button type="button" class="sb-course-btn" data-status="' + course.status + '" aria-expanded="' + isOpen + '">';
+    html += '<span class="sb-caret" aria-hidden="true"></span>';
+    html += '<span class="sb-dot" title="' + (STATUS_LABEL[course.status]||course.status) + '"></span>';
+    html += '<span class="sb-course-name">' + course.product + ' · ' + course.trackLabel + '</span>';
+    html += '</button>';
+    if(course.modules.length){
+      html += '<ul class="sb-modules">';
+      course.modules.forEach(function(m){
+        var isCurrent = (m.file === currentFile);
+        html += '<li><a href="' + m.file + '"' + (isCurrent ? ' class="current" aria-current="page"' : '') + '>';
+        html += '<span class="sb-no">' + m.no + '</span>' + m.title;
+        html += '</a></li>';
+      });
+      html += '</ul>';
+    } else {
+      html += '<ul class="sb-modules"><li class="sb-empty">아직 모듈 없음</li></ul>';
+    }
+    html += '</div>';
+  });
+  nav.innerHTML = html;
+
+  nav.addEventListener('click', function(e){
+    var btn = e.target.closest('.sb-course-btn');
+    if(!btn) return;
+    var courseEl = btn.closest('.sb-course');
+    var courseId = courseEl.getAttribute('data-course');
+    var willOpen = !courseEl.classList.contains('open');
+    courseEl.classList.toggle('open', willOpen);
+    btn.setAttribute('aria-expanded', String(willOpen));
+
+    var ids = readOpenCourseIds();
+    var idx = ids.indexOf(courseId);
+    if(willOpen && idx === -1) ids.push(courseId);
+    if(!willOpen && idx !== -1) ids.splice(idx, 1);
+    writeOpenCourseIds(ids);
+  });
+
+  /* 현재 모듈이 속한 코스가 (사용자 조작으로) 이미 펼쳐져 있는 경우에만
+     사이드바 내부를 스크롤해 보여준다 — 접혀 있으면 건드리지 않는다. */
+  var currentLink = nav.querySelector('a.current');
+  var sidebarEl = document.getElementById('courseSidebar');
+  if(currentLink && sidebarEl && currentLink.closest('.sb-course.open')){
+    var linkTop = currentLink.offsetTop;
+    var linkBottom = linkTop + currentLink.offsetHeight;
+    var viewTop = sidebarEl.scrollTop;
+    var viewBottom = viewTop + sidebarEl.clientHeight;
+    if(linkTop < viewTop || linkBottom > viewBottom){
+      sidebarEl.scrollTop = Math.max(0, linkTop - sidebarEl.clientHeight / 2);
+    }
+  }
+
+  /* --- topbar 왼쪽 햄버거 버튼 하나로 사이드바 표시를 제어.
+     데스크톱(960px 초과): 기본 표시, 버튼 클릭 시 숨김(폭 반환).
+     모바일(960px 이하): 기본 숨김(오버레이), 버튼 클릭 시 오버레이로 표시.
+     "다음/이전 모듈"로 페이지를 이동해도 직전에 선택한 표시 상태가
+     이어지도록 localStorage에 저장한다(파일마다 독립 실행되는 정적
+     페이지라 이 값 없이는 이동할 때마다 항상 기본 상태로 되돌아간다). */
+  var VISIBLE_STORAGE_KEY = 'curriculum-sidebar-visible';
+  var fab = document.getElementById('sbFab');
+  var backdrop = document.getElementById('sidebarBackdrop');
+  var mq = window.matchMedia('(max-width:960px)');
+
+  /* 모바일 topbar는 화면 폭에 따라 2~3줄로 접힐 수 있다. 고정 px 값 대신
+     실제 높이를 CSS 변수로 넘겨 사이드바 첫 항목이 topbar 뒤에 가려지지 않게 한다. */
+  function syncTopbarHeight(){
+    var topbar = document.querySelector('.topbar');
+    if(!topbar) return;
+    var h = Math.ceil(topbar.getBoundingClientRect().height);
+    document.documentElement.style.setProperty('--curriculum-topbar-height', h + 'px');
+  }
+
+  function readStoredVisible(){
+    try{
+      var v = window.localStorage.getItem(VISIBLE_STORAGE_KEY);
+      return v === null ? null : v === '1';
+    }catch(e){ return null; } /* 저장소 접근 불가 환경(파일 직접 열람 등) 대비 */
+  }
+  function writeStoredVisible(visible){
+    try{ window.localStorage.setItem(VISIBLE_STORAGE_KEY, visible ? '1' : '0'); }catch(e){}
+  }
+
+  function applyVisible(visible){
+    if(mq.matches){
+      document.body.classList.toggle('sidebar-open', visible);
+      document.body.classList.remove('sidebar-hidden');
+    } else {
+      document.body.classList.toggle('sidebar-hidden', !visible);
+      document.body.classList.remove('sidebar-open');
+    }
+    if(fab) fab.setAttribute('aria-expanded', String(visible));
+  }
+
+  syncTopbarHeight();
+  var stored = readStoredVisible();
+  var initialVisible = stored === null ? !mq.matches : stored;
+  applyVisible(initialVisible);
+
+  if(fab){
+    fab.addEventListener('click', function(){
+      var nowVisible = mq.matches
+        ? document.body.classList.contains('sidebar-open')
+        : !document.body.classList.contains('sidebar-hidden');
+      var next = !nowVisible;
+      applyVisible(next);
+      writeStoredVisible(next);
+    });
+  }
+  if(backdrop){
+    backdrop.addEventListener('click', function(){
+      applyVisible(false);
+      writeStoredVisible(false);
+    });
+  }
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && mq.matches && document.body.classList.contains('sidebar-open')){
+      applyVisible(false);
+      writeStoredVisible(false);
+    }
+  });
+  /* 데스크톱 <-> 모바일 경계를 넘나들며 화면 폭을 바꾸는 경우에도
+     저장된 선호에 맞춰 다시 계산 (모바일 오버레이 클래스와 데스크톱
+     폭-반환 클래스가 서로 섞이지 않도록) */
+  mq.addEventListener('change', function(){
+    syncTopbarHeight();
+    var v = readStoredVisible();
+    applyVisible(v === null ? !mq.matches : v);
+  });
+  window.addEventListener('resize', syncTopbarHeight);
+})();
+</script>
+
+</body>
+</html>

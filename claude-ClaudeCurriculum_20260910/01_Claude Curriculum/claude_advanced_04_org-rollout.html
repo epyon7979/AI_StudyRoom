@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude 상급 04 — 조직 표준 배포 설계</title>
+<style>
+/* ==========================================================================
+   Anthropic 제품 교육 커리큘럼 — 공용 스타일시트
+   버전: v1.1 / 확정일: 2026-08-19 (v1.1: 2026-08-20 .checkpoint 추가)
+   적용 대상: index.html, glossary.html, 모든 모듈 HTML 파일
+   원칙: 외부 CDN·웹폰트·이미지 참조 없음(오프라인 열람 가능)
+   사용법: 이 블록 전체를 각 파일의 <style> 안에 그대로 복사한다.
+          수정 시 기존 모든 파일에 동일하게 반영한다.
+   ========================================================================== */
+
+/* --- 1. 토큰 ------------------------------------------------------------ */
+:root{
+  --ink:#1B1F24;
+  --body:#3A3F46;
+  --muted:#6B7280;
+  --line:#E6E9EE;
+  --line-strong:#D2D9E3;
+  --bg:#FFFFFF;
+  --bg-soft:#F7F9FC;
+  --bg-practice:#F3F7FC;
+  --bg-code:#1E2430;
+
+  --blue:#2F6FCB;
+  --blue-dark:#255AA8;
+  --accent:#E2612B;
+
+  --track-basic:#2F6FCB;
+  --track-custom:#0E8A6B;
+  --track-advanced:#7A3E9D;
+  --track:var(--blue);          /* body[data-track]에서 덮어씀 */
+
+  --info:#2F6FCB;   --info-bg:#F0F5FC;
+  --tip:#0E8A6B;    --tip-bg:#EEF7F3;
+  --warn:#B76A08;   --warn-bg:#FDF6EA;
+  --danger:#C0392B; --danger-bg:#FDF1EF;
+
+  --st-todo:#6B7280;   --st-todo-bg:#F1F3F6;
+  --st-planned:#2F6FCB;--st-planned-bg:#EDF3FC;
+  --st-writing:#B76A08;--st-writing-bg:#FDF6EA;
+  --st-done:#0E8A6B;   --st-done-bg:#EAF6F1;
+
+  --radius:10px;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Apple SD Gothic Neo",
+         "Malgun Gothic","맑은 고딕","Noto Sans KR",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"D2Coding",
+         "Nanum Gothic Coding","Courier New",monospace;
+}
+
+/* 트랙별 강조색: <body data-track="basic|custom|advanced"> */
+body[data-track="basic"]   { --track:var(--track-basic); }
+body[data-track="custom"]  { --track:var(--track-custom); }
+body[data-track="advanced"]{ --track:var(--track-advanced); }
+
+/* --- 2. 기본 ------------------------------------------------------------ */
+*{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15.5px;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+.page{ max-width:940px; margin:0 auto; padding:0 24px 64px; }
+p{ margin:0 0 12px; color:var(--body); }
+a{ color:var(--blue-dark); }
+a:hover{ color:var(--accent); }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+hr{ border:0; border-top:1px solid var(--line); margin:28px 0; }
+small{ font-size:13px; color:var(--muted); }
+
+/* --- 3. 상단 내비게이션 -------------------------------------------------- */
+.topbar{
+  position:sticky; top:0; z-index:20;
+  background:rgba(255,255,255,.96);
+  border-bottom:1px solid var(--line);
+  backdrop-filter:saturate(180%) blur(6px);
+}
+.topbar-inner{
+  max-width:940px; margin:0 auto; padding:10px 24px;
+  display:flex; flex-wrap:nowrap; gap:10px 14px; align-items:center;
+  justify-content:flex-start; min-width:0;
+}
+.topbar-tags{
+  display:flex; flex:0 0 auto; flex-wrap:nowrap; gap:6px; align-items:center;
+}
+.topbar-nav{
+  display:flex; flex:1 1 auto; min-width:0; flex-wrap:nowrap; gap:6px; align-items:center;
+}
+.navlink{
+  display:inline-block; flex:0 0 auto; padding:5px 11px; border-radius:999px;
+  border:1px solid var(--line-strong); background:#fff;
+  font-size:13px; font-weight:600; color:var(--body); text-decoration:none;
+  white-space:nowrap;
+}
+/* 이전/다음만 남은 폭 안에서 줄어들며 제목을 말줄임표 처리한다. */
+.topbar-nav .navlink-step{
+  flex:0 1 auto; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.navlink:hover{ border-color:var(--track); color:var(--track); }
+.navlink.current{ background:var(--bg-soft); color:var(--muted); border-style:dashed; }
+.navlink.disabled{
+  color:#AEB4BD; border-color:var(--line); background:var(--bg-soft);
+  pointer-events:none; cursor:default;
+}
+
+/* --- 3b. 코스 사이드바 ---------------------------------------------------- */
+.layout{ display:flex; align-items:flex-start; width:100%; max-width:1180px; margin:0 auto; }
+.layout > .page{ flex:1 1 0; min-width:0; }
+.sidebar{
+  position:sticky; top:53px; flex:0 0 240px; width:240px;
+  max-height:calc(100vh - 53px); overflow-y:auto;
+  padding:18px 12px 40px 24px; box-sizing:border-box;
+  border-right:1px solid var(--line);
+  transition:margin-left .15s ease, opacity .15s ease;
+}
+.sidebar-title{
+  font-size:11px; font-weight:800; letter-spacing:.04em; color:var(--muted);
+  text-transform:uppercase; margin:0 0 10px; padding:0 4px;
+}
+.sb-course{ margin-bottom:2px; }
+.sb-course-btn{
+  display:flex; align-items:center; gap:7px; width:100%;
+  background:none; border:0; padding:7px 4px; cursor:pointer;
+  font-family:var(--sans); font-size:13.5px; font-weight:700; color:var(--ink);
+  text-align:left; border-radius:6px;
+}
+.sb-course-btn:hover{ background:var(--bg-soft); }
+.sb-course-btn .sb-caret{
+  display:inline-block; width:9px; height:9px; flex-shrink:0;
+  border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
+  transform:rotate(-45deg); transition:transform .15s ease;
+}
+.sb-course.open .sb-course-btn .sb-caret{ transform:rotate(45deg); }
+.sb-course-btn .sb-dot{
+  width:6px; height:6px; border-radius:50%; flex-shrink:0; background:var(--st-todo);
+}
+.sb-course-btn[data-status="done"] .sb-dot{ background:var(--st-done); }
+.sb-course-btn[data-status="writing"] .sb-dot{ background:var(--st-writing); }
+.sb-course-btn[data-status="planned"] .sb-dot{ background:var(--st-planned); }
+.sb-course-btn .sb-course-name{ flex:1 1 auto; }
+.sb-modules{
+  list-style:none; margin:0 0 6px; padding:0 0 0 15px;
+  display:none; border-left:1px solid var(--line); margin-left:8px;
+}
+.sb-course.open .sb-modules{ display:block; }
+.sb-modules li{ margin:0; }
+.sb-modules a{
+  display:block; padding:5px 8px; margin:1px 0;
+  font-size:12.5px; line-height:1.5; color:var(--body); text-decoration:none;
+  border-radius:5px; border-left:2px solid transparent;
+}
+.sb-modules a:hover{ background:var(--bg-soft); color:var(--track); }
+.sb-modules a .sb-no{ color:var(--muted); font-weight:700; margin-right:5px; }
+.sb-modules a.current{
+  background:var(--bg-soft); color:var(--track); font-weight:700;
+  border-left-color:var(--track);
+}
+.sb-empty{ padding:5px 8px; font-size:12px; color:var(--muted); }
+.sidebar-backdrop{ display:none; }
+
+/* 상단 topbar 맨 왼쪽(제품 태그보다 앞) 햄버거 버튼 — topbar-inner의 일반 flex 아이템이라
+   topbar가 sticky이므로 스크롤해도 함께 고정되고, 사이드바 열림/닫힘과 무관하게 항상 같은 자리 */
+.sb-fab{
+  flex:0 0 auto; order:-1;
+  width:30px; height:30px; padding:0; border-radius:7px;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--line-strong); background:#fff; cursor:pointer;
+  position:relative; z-index:1;
+}
+.sb-fab:hover{ border-color:var(--track); }
+.sb-fab .sb-fab-bar{
+  display:block; width:14px; height:2px; background:var(--body); border-radius:1px;
+  position:relative;
+}
+.sb-fab .sb-fab-bar::before, .sb-fab .sb-fab-bar::after{
+  content:""; position:absolute; left:0; width:14px; height:2px;
+  background:var(--body); border-radius:1px;
+}
+.sb-fab .sb-fab-bar::before{ top:-4px; }
+.sb-fab .sb-fab-bar::after{ top:4px; }
+
+/* 데스크톱: 사이드바 숨김 시 폭을 반환(오버레이 아님) */
+body.sidebar-hidden .sidebar{
+  width:0; flex-basis:0; padding-left:0; padding-right:0; border-right:0;
+  overflow:hidden; opacity:0; margin-left:-1px;
+}
+
+@media (max-width:960px){
+  .layout{ display:block; }
+  .sidebar{
+    position:fixed; top:var(--curriculum-topbar-height, 53px); left:0; z-index:40;
+    height:calc(100vh - var(--curriculum-topbar-height, 53px)); max-height:none; width:280px;
+    background:#fff; border-right:1px solid var(--line-strong);
+    padding:16px 14px 40px 24px;
+    transform:translateX(-100%); transition:transform .2s ease;
+    box-shadow:2px 0 18px rgba(0,0,0,.12);
+    opacity:1; /* 데스크톱 전용 opacity 규칙 무효화 */
+  }
+  /* 모바일에서는 기본이 숨김 상태. sidebar-hidden이 아니라 sidebar-open일 때만 보임 */
+  body.sidebar-open .sidebar{ transform:translateX(0); }
+  body.sidebar-hidden .sidebar{ width:280px; flex-basis:auto; overflow:visible; margin-left:0; }
+  .sidebar-backdrop{
+    display:none; position:fixed; inset:0; z-index:30;
+    background:rgba(20,24,30,.35);
+  }
+  body.sidebar-open .sidebar-backdrop{ display:block; }
+
+  /* .topbar(z-index:20, §10 공용 CSS)는 기본적으로 사이드바(40)·백드롭(30)보다
+     쌓임 순서가 낮다 — 자식 .sb-fab에 아무리 높은 z-index를 줘도 부모의
+     스택 컨텍스트를 벗어날 수 없으므로, 사이드바가 열린 동안만 topbar
+     자체의 z-index를 둘 다보다 높여 햄버거 버튼이 항상 눌리게 한다.
+     (이걸 하지 않으면 모바일에서 사이드바를 열고 나면 버튼이 그 뒤에
+     가려져 다시 눌러 닫을 방법이 없어진다.) */
+  body.sidebar-open .topbar{ z-index:41; }
+}
+
+/* --- 4. 태그 / 배지 ------------------------------------------------------ */
+.tag{
+  display:inline-block; padding:3px 10px; border-radius:999px;
+  font-size:12px; font-weight:700; line-height:1.6; white-space:nowrap;
+  border:1px solid transparent;
+}
+.tag-product{ background:#EEF1F5; color:#333A44; border-color:#DDE2E9; }
+.tag-basic{ background:#EDF3FC; color:var(--track-basic); border-color:#CFE0F6; }
+.tag-custom{ background:#EAF6F1; color:var(--track-custom); border-color:#C8E7DC; }
+.tag-advanced{ background:#F4EDFA; color:var(--track-advanced); border-color:#E0CDEF; }
+.tag-beta{ background:#FDF6EA; color:var(--warn); border-color:#F3E0BC; }
+.tag-muted{ background:#F1F3F6; color:var(--muted); border-color:#E3E7EC; }
+
+.status{
+  display:inline-block; padding:3px 10px; border-radius:6px;
+  font-size:12px; font-weight:700; white-space:nowrap;
+}
+.status-todo{ background:var(--st-todo-bg); color:var(--st-todo); }
+.status-planned{ background:var(--st-planned-bg); color:var(--st-planned); }
+.status-writing{ background:var(--st-writing-bg); color:var(--st-writing); }
+.status-done{ background:var(--st-done-bg); color:var(--st-done); }
+
+.unverified{
+  display:inline-block; padding:2px 8px; border-radius:6px;
+  background:var(--warn-bg); color:var(--warn);
+  font-size:12px; font-weight:700; border:1px dashed #EBD3A8;
+}
+
+/* --- 5. 문서 머리말 ------------------------------------------------------ */
+.doc-header{ padding:32px 0 20px; border-bottom:3px solid var(--track); margin-bottom:28px; }
+.eyebrow{
+  font-size:12.5px; font-weight:700; letter-spacing:.06em;
+  color:var(--track); text-transform:uppercase; margin:0 0 6px;
+}
+h1{ font-size:27px; font-weight:800; letter-spacing:-.01em; margin:0 0 10px; line-height:1.4; }
+h1 .hl{ color:var(--accent); }
+.lede{ font-size:15.5px; color:var(--body); margin:0; max-width:70ch; }
+
+h2{
+  font-size:20px; font-weight:800; margin:36px 0 12px; padding-left:12px;
+  border-left:5px solid var(--track); line-height:1.5;
+}
+h3{ font-size:16.5px; font-weight:700; margin:22px 0 8px; }
+h4{ font-size:15px; font-weight:700; margin:16px 0 6px; color:var(--body); }
+
+/* --- 6. 모듈 정보(메타) -------------------------------------------------- */
+.meta{
+  display:grid; grid-template-columns:150px 1fr; gap:1px;
+  background:var(--line); border:1px solid var(--line);
+  border-radius:var(--radius); overflow:hidden; margin:0 0 24px;
+}
+.meta dt{ background:var(--bg-soft); padding:9px 14px; font-size:13.5px; font-weight:700; }
+.meta dd{ background:#fff; padding:9px 14px; margin:0; font-size:13.5px; color:var(--body); }
+
+/* --- 7. 섹션(설명 영역 / 실습 영역) -------------------------------------- */
+.section{
+  background:#fff; border:1px solid var(--line); border-radius:var(--radius);
+  padding:20px 22px; margin:0 0 20px;
+}
+.section.practice{
+  background:var(--bg-practice); border-color:#D9E4F2;
+  border-left:5px solid var(--track);
+}
+.section > :first-child{ margin-top:0; }
+.section > :last-child{ margin-bottom:0; }
+.section-kind{
+  display:inline-block; margin:0 0 10px; padding:2px 9px; border-radius:5px;
+  font-size:12px; font-weight:700; letter-spacing:.02em;
+  background:#EEF1F5; color:#4B535D;
+}
+.section.practice .section-kind{ background:var(--track); color:#fff; }
+
+/* --- 8. 목록 / 단계 ------------------------------------------------------ */
+ul,ol{ margin:0 0 12px; padding-left:22px; color:var(--body); }
+li{ margin:3px 0; }
+
+.steps{ list-style:none; counter-reset:step; padding:0; margin:14px 0; }
+.steps > li{
+  counter-increment:step; position:relative;
+  padding:0 0 16px 40px; margin:0;
+  border-left:2px solid var(--line-strong); margin-left:13px;
+}
+.steps > li:last-child{ border-left-color:transparent; padding-bottom:0; }
+.steps > li::before{
+  content:counter(step,decimal-leading-zero);
+  position:absolute; left:-14px; top:0;
+  width:27px; height:27px; border-radius:50%;
+  background:var(--track); color:#fff;
+  font-size:12px; font-weight:700; font-family:var(--mono);
+  display:flex; align-items:center; justify-content:center;
+}
+.step-title{ font-weight:700; color:var(--ink); display:block; margin-bottom:4px; }
+
+/* --- 8b. 구간 체크 (긴 실습의 중간 점검) -------------------------------- */
+.checkpoint{
+  border:1px dashed var(--track); border-left:5px solid var(--track);
+  border-radius:8px; background:var(--bg-soft);
+  padding:12px 16px; margin:16px 0 4px;
+}
+.checkpoint-title{
+  display:block; font-weight:700; font-size:13.5px;
+  color:var(--track); margin-bottom:6px; letter-spacing:.01em;
+}
+.checkpoint ul{ margin:0; padding-left:20px; }
+.checkpoint li{ font-size:14px; margin:2px 0; }
+.checkpoint p{ font-size:14px; margin:6px 0 0; }
+
+/* --- 9. 코드 블록 -------------------------------------------------------- */
+pre{
+  background:var(--bg-code); color:#E8EDF5;
+  border-radius:8px; padding:14px 16px; margin:10px 0 14px;
+  overflow-x:auto; line-height:1.65;
+}
+pre code{
+  font-family:var(--mono); font-size:13px;
+  background:none; color:inherit; padding:0; border:0; white-space:pre;
+}
+code{
+  font-family:var(--mono); font-size:.9em;
+  background:#EEF1F5; color:#243044;
+  padding:1px 5px; border-radius:4px; border:1px solid #E1E6EC;
+}
+.code-label{
+  display:inline-block; margin:12px 0 0; padding:3px 10px;
+  border-radius:6px 6px 0 0; background:#2B3444; color:#C9D4E3;
+  font-family:var(--mono); font-size:11.5px; font-weight:700;
+}
+.code-label + pre{ margin-top:0; border-top-left-radius:0; }
+.code-caption{ font-size:12.5px; color:var(--muted); margin:-8px 0 14px; }
+
+/* UI 명칭·메뉴 경로 표기 */
+.ui{ font-weight:700; color:var(--ink); }
+.path{ font-family:var(--mono); font-size:.92em; color:var(--blue-dark); }
+
+/* --- 10. 콜아웃(경고·주의 박스) ------------------------------------------ */
+.callout{
+  border:1px solid; border-left-width:5px; border-radius:8px;
+  padding:12px 16px; margin:14px 0;
+}
+.callout > :first-child{ margin-top:0; }
+.callout > :last-child{ margin-bottom:0; }
+.callout-title{ display:block; font-weight:700; font-size:14px; margin-bottom:4px; }
+.callout p, .callout li{ font-size:14.5px; }
+.callout-info{ background:var(--info-bg); border-color:#CFE0F6; border-left-color:var(--info); }
+.callout-info .callout-title{ color:var(--info); }
+.callout-tip{ background:var(--tip-bg); border-color:#C8E7DC; border-left-color:var(--tip); }
+.callout-tip .callout-title{ color:var(--tip); }
+.callout-warn{ background:var(--warn-bg); border-color:#F3E0BC; border-left-color:var(--warn); }
+.callout-warn .callout-title{ color:var(--warn); }
+.callout-danger{ background:var(--danger-bg); border-color:#F5CFC9; border-left-color:var(--danger); }
+.callout-danger .callout-title{ color:var(--danger); }
+
+/* --- 11. 체크리스트 ------------------------------------------------------ */
+.checklist{ list-style:none; padding:0; margin:12px 0; }
+.checklist li{
+  display:flex; gap:10px; align-items:flex-start;
+  padding:9px 13px; margin:0 0 7px;
+  background:#fff; border:1px solid var(--line); border-radius:8px;
+  font-size:14.5px; color:var(--body);
+}
+.checklist input[type="checkbox"]{
+  width:16px; height:16px; margin:5px 0 0; flex-shrink:0;
+  accent-color:var(--track); cursor:pointer;
+}
+.checklist label{ cursor:pointer; }
+
+/* --- 12. 표 -------------------------------------------------------------- */
+.table-wrap{ overflow-x:auto; margin:12px 0 18px; }
+table{
+  width:100%; border-collapse:collapse;
+  border:1px solid var(--line); border-radius:var(--radius);
+  overflow:hidden; font-size:14px;
+}
+thead th{
+  background:var(--blue); color:#fff; font-weight:700;
+  text-align:left; padding:9px 13px; white-space:nowrap;
+}
+tbody td, tbody th{
+  border-top:1px solid var(--line); padding:9px 13px;
+  color:var(--body); vertical-align:top; text-align:left;
+}
+tbody th{ font-weight:700; color:var(--ink); background:var(--bg-soft); }
+tbody tr:nth-child(even) td{ background:var(--bg-soft); }
+td code, th code{ white-space:nowrap; }
+
+/* --- 13. 캡처 지시서 / 자리표시 ------------------------------------------ */
+.capture{
+  border:1px solid var(--line-strong); border-radius:8px;
+  background:#fff; margin:14px 0; overflow:hidden;
+}
+.capture-head{
+  background:#2B3444; color:#fff; padding:7px 14px;
+  font-size:13px; font-weight:700; font-family:var(--mono);
+}
+.capture dl{
+  display:grid; grid-template-columns:96px 1fr; gap:0;
+  margin:0; padding:10px 14px; font-size:13.5px;
+}
+.capture dt{ font-weight:700; color:var(--ink); padding:3px 0; }
+.capture dd{ margin:0; padding:3px 0; color:var(--body); }
+
+.screenshot-placeholder{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:130px; padding:22px 18px; margin:12px 0 16px;
+  border:2px dashed var(--line-strong); border-radius:8px;
+  background:repeating-linear-gradient(45deg,#FAFBFD,#FAFBFD 10px,#F3F6FA 10px,#F3F6FA 20px);
+  text-align:center;
+}
+.screenshot-placeholder .ph-no{
+  font-family:var(--mono); font-size:12.5px; font-weight:700;
+  color:#fff; background:#2B3444; padding:2px 9px; border-radius:5px; margin-bottom:8px;
+}
+.screenshot-placeholder .ph-desc{ font-size:13.5px; color:var(--muted); margin:0; max-width:52ch; }
+figure{ margin:12px 0 16px; }
+figure img{ max-width:100%; height:auto; border:1px solid var(--line-strong); border-radius:8px; display:block; }
+figcaption{ font-size:13px; color:var(--muted); margin-top:6px; }
+
+/* --- 14. 출처 / 참고 자료 ------------------------------------------------ */
+.src{ font-size:12.5px; color:var(--muted); }
+.reflist{ list-style:none; padding:0; margin:10px 0; }
+.reflist li{
+  padding:8px 0; border-bottom:1px dashed var(--line); font-size:13.5px; color:var(--body);
+}
+.reflist li:last-child{ border-bottom:0; }
+.reflist .ref-date{ color:var(--muted); font-size:12.5px; }
+
+/* --- 15. index.html 전용 ------------------------------------------------- */
+.progress{
+  display:flex; flex-wrap:wrap; gap:10px; margin:0 0 24px;
+}
+.progress-card{
+  flex:1 1 200px; border:1px solid var(--line); border-radius:var(--radius);
+  background:var(--bg-soft); padding:14px 16px;
+}
+.progress-card .pc-label{ font-size:12.5px; font-weight:700; color:var(--muted); display:block; }
+.progress-card .pc-value{ font-size:22px; font-weight:800; color:var(--ink); font-family:var(--mono); }
+.progress-card .pc-note{ font-size:12.5px; color:var(--muted); display:block; margin-top:2px; }
+
+.part{ margin:0 0 10px; }
+.course{
+  border:1px solid var(--line); border-left:5px solid var(--track);
+  border-radius:var(--radius); background:#fff; padding:16px 18px; margin:0 0 14px;
+}
+.course[data-track="basic"]{ --track:var(--track-basic); }
+.course[data-track="custom"]{ --track:var(--track-custom); }
+.course[data-track="advanced"]{ --track:var(--track-advanced); }
+.course-head{
+  display:flex; flex-wrap:wrap; gap:8px 12px;
+  align-items:center; justify-content:space-between; margin-bottom:8px;
+}
+.course-head h3{ margin:0; font-size:16.5px; }
+.course-id{ display:flex; flex-wrap:wrap; gap:7px; align-items:center; }
+.course-note{ font-size:13.5px; color:var(--muted); margin:0 0 10px; }
+.module-table{ font-size:13.5px; }
+.module-table .mod-no{ font-family:var(--mono); font-weight:700; white-space:nowrap; }
+.module-table .empty-row td{
+  text-align:center; color:var(--muted); font-size:13px;
+  background:var(--bg-soft); padding:14px;
+}
+
+/* --- 16. glossary.html 전용 --------------------------------------------- */
+.filter-bar{ margin:0 0 18px; }
+.filter-bar input{
+  width:100%; max-width:420px; padding:9px 13px;
+  border:1px solid var(--line-strong); border-radius:8px;
+  font-family:var(--sans); font-size:14.5px; color:var(--ink); background:#fff;
+}
+.filter-bar input:focus{ outline:2px solid var(--track); outline-offset:1px; }
+.filter-count{ font-size:13px; color:var(--muted); margin-left:10px; }
+.term-table td:first-child{ width:230px; }
+.term{ font-weight:700; color:var(--ink); display:block; }
+.term-en{ font-family:var(--mono); font-size:12.5px; color:var(--muted); display:block; }
+.term-row.is-hidden{ display:none; }
+.no-result{ padding:18px; text-align:center; color:var(--muted); font-size:14px; }
+
+/* --- 17. 푸터 ----------------------------------------------------------- */
+.doc-footer{
+  margin-top:40px; padding-top:16px; border-top:1px solid var(--line);
+  font-size:13px; color:var(--muted);
+  display:flex; flex-wrap:wrap; gap:6px 18px; justify-content:space-between;
+}
+.doc-footer .checked-date{ font-weight:700; color:var(--body); }
+
+/* --- 18. 반응형 --------------------------------------------------------- */
+@media (max-width:720px){
+  body{ font-size:15px; }
+  .page{ padding:0 16px 48px; }
+  .topbar-inner{
+    padding:9px 16px;
+    overflow-x:auto; overflow-y:hidden;
+    scrollbar-width:none; overscroll-behavior-x:contain;
+  }
+  .topbar-inner::-webkit-scrollbar{ display:none; }
+  .topbar-nav{ flex:0 0 auto; }
+  .topbar-nav .navlink-step{ max-width:180px; }
+  h1{ font-size:23px; }
+  h2{ font-size:18px; }
+  .meta{ grid-template-columns:1fr; }
+  .meta dt{ padding-bottom:2px; }
+  .capture dl{ grid-template-columns:1fr; }
+  .capture dt{ padding-bottom:0; }
+  .term-table td:first-child{ width:auto; }
+  .section{ padding:16px; }
+}
+
+/* --- 19. 인쇄 ----------------------------------------------------------- */
+@media print{
+  .topbar, .filter-bar, .sidebar, .sidebar-backdrop, .sb-fab{ display:none; }
+  body{ font-size:11pt; }
+  .page{ max-width:none; padding:0; }
+  .layout{ display:block; max-width:none; }
+  .section, .course, .callout, .capture, .checklist li{
+    break-inside:avoid; page-break-inside:avoid;
+  }
+  pre{ background:#F2F4F7; color:#111; border:1px solid #CCC; white-space:pre-wrap; }
+  thead th{ background:#DDE3EC !important; color:#111 !important; }
+  a{ color:#111; text-decoration:underline; }
+}
+
+/* --- 20. 모션 축소 선호 -------------------------------------------------- */
+@media (prefers-reduced-motion:reduce){
+  html{ scroll-behavior:auto; }
+  *{ animation:none !important; transition:none !important; }
+}
+</style>
+</head>
+<body data-track="advanced">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-tags">
+      <button type="button" class="sb-fab" id="sbFab" aria-expanded="true" aria-controls="courseSidebar" aria-label="전체 코스 목록 열기/닫기">
+        <span class="sb-fab-bar" aria-hidden="true"></span>
+      </button>
+      <span class="tag tag-product">Claude</span>
+      <span class="tag tag-advanced">상급 advanced</span>
+      <span class="tag tag-muted">모듈 04</span>
+    </div>
+    <nav class="topbar-nav" aria-label="문서 이동">
+      <a class="navlink navlink-step" href="claude_advanced_03_prompt-assets.html">이전: 03 프롬프트를 재사용 자산으로</a>
+      <span class="navlink navlink-step disabled">다음 모듈 없음 (코스 종료)</span>
+      <a class="navlink" href="index.html">로드맵</a>
+      <a class="navlink" href="glossary.html">용어집</a>
+    </nav>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="courseSidebar" aria-label="전체 코스 목록">
+    <p class="sidebar-title">전체 코스</p>
+    <div id="sidebarNav"></div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<div class="page">
+
+  <div class="doc-header">
+    <p class="eyebrow">Claude · 상급 · 모듈 04</p>
+    <h1>조직 표준 <span class="hl">배포 설계</span></h1>
+    <p class="lede">내 자산을 조직 표준으로 올리는 순간 <strong>남의 대화까지 바꿉니다.</strong> 잘못 만든 규칙은 전원을 막고 각자는 우회할 수 없습니다. 배포하기 전에 무엇을 결정해야 하는지 다룹니다.</p>
+  </div>
+
+  <h2>1. 모듈 정보</h2>
+
+  <dl class="meta">
+    <dt>제품</dt><dd>Claude</dd>
+    <dt>트랙</dt><dd>상급 (advanced)</dd>
+    <dt>번호 · 제목</dt><dd>04 · 조직 표준 배포 설계</dd>
+    <dt>예상 소요 시간</dt><dd>45분 (읽기 18분 + 실습 27분)</dd>
+    <dt>확인 기준일</dt><dd>2026-08-26</dd>
+    <dt>기준 요금제</dt><dd><strong>학습은 Pro 또는 Max로 가능합니다.</strong> 다만 실제 배포는 <strong>Team·Enterprise의 Admin 이상 권한</strong>이 필요해 이 모듈은 <strong>배포하지 않고 계획서를 만듭니다</strong>(3-3).</dd>
+    <dt>기준 버전</dt><dd>claude.ai 웹 기준.</dd>
+  </dl>
+
+  <h2>2. 학습 목표</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+    <p>이 모듈을 마치면 다음을 할 수 있습니다.</p>
+    <ol>
+      <li>개인 지침과 조직 지침의 우선순위를 알고 조직 지침에 무엇을 담을지 판단할 수 있다.</li>
+      <li>단계별 확산 계획을 세우고 각 단계의 확인 항목을 정할 수 있다.</li>
+      <li>되돌리기 절차와 사용량 통제를 포함한 배포 계획서를 만들 수 있다.</li>
+    </ol>
+  </div>
+
+  <h2>3. 사전 준비</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+
+    <h3>3-1. 준비물</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>항목</th><th>내용</th></tr></thead>
+        <tbody>
+          <tr><th>필요 플랜</th><td>학습은 Pro·Max로 충분. 배포는 Team·Enterprise Admin 이상(3-3).</td></tr>
+          <tr><th>사전 지식</th><td><strong><a href="claude_advanced_03_prompt-assets.html">상급 03</a> 수료 필수.</strong> 03의 10단계에서 만든 <strong>자산 목록</strong>이 이 모듈의 재료입니다.</td></tr>
+          <tr><th>준비물</th><td>상급 03의 자산 목록과 <code>VERIFICATION.md</code>. 계획서를 쓸 문서 편집기.</td></tr>
+          <tr><th>예상 사용량</th><td>프롬프트 3회. 계획서 작성이 주된 작업입니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>3-2. 이 문서의 표기 방식</h3>
+    <p>상급 01~03과 같습니다.</p>
+
+    <h3>3-3. 배포하지 않고 계획서를 만듭니다</h3>
+    <div class="callout callout-info">
+      <span class="callout-title">권한이 없어서가 아니라, 그것이 상급의 일이기 때문입니다</span>
+      <p>조직 지침은 <strong>Team·Enterprise 플랜의 Admin 이상</strong>만 설정할 수 있습니다. <span class="src">(출처: support.claude.com/en/articles/14546867, 2026-08-26 확인)</span> 이 커리큘럼의 학습자 대부분은 그 권한이 없습니다.</p>
+      <p>그러나 권한이 있어도 <strong>먼저 해야 할 일은 배포가 아니라 계획</strong>입니다. 이 모듈의 결과물인 계획서는 <strong>권한을 가진 사람에게 그대로 제출할 수 있는 문서</strong>입니다. Claude Code 상급 05와 같은 방식입니다.</p>
+    </div>
+    <div class="callout callout-warn">
+      <span class="callout-title">캡처가 없는 이유</span>
+      <p>관리자 화면을 실습하지 않으므로 <strong>이 모듈에는 캡처가 없습니다.</strong> 권한을 가진 담당자가 실제 배포를 진행할 때 화면을 확인하시고, 필요하면 그때 캡처를 추가하세요(9번 절).</p>
+    </div>
+  </div>
+
+  <h2>4. 핵심 개념</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+
+    <h3>4-1. 결론부터</h3>
+    <p><strong>조직 지침은 개인 지침을 이깁니다. 그래서 조직 지침에 담을 것은 "좋은 규칙"이 아니라 "모두에게 참인 규칙"입니다.</strong></p>
+    <p>공식 문서가 우선순위를 명확히 정의합니다 — 둘 다 설정된 경우 <strong>조직 지침이 우선</strong>하며, 개인 지침이 조직 지침과 직접 충돌하면 <strong>Claude는 조직 수준 지침을 따릅니다.</strong> <span class="src">(출처: support.claude.com/en/articles/14546867, 2026-08-26 확인)</span></p>
+    <div class="callout callout-danger">
+      <span class="callout-title">공식 문서의 예시가 그대로 위험 사례입니다</span>
+      <p>조직 지침이 <strong>"항상 격식 있는 영어로 답하라"</strong>이고 개인 지침이 <strong>"편한 어조로"</strong>이면, Claude는 <strong>격식 있게</strong> 답합니다. <span class="src">(출처: support.claude.com/en/articles/14546867, 2026-08-26 확인)</span></p>
+      <p>이 예시를 뒤집어 보면 위험이 보입니다 — 조직이 언어나 어조를 못 박으면 <strong>그것이 안 맞는 업무를 하는 사람은 우회할 수 없습니다.</strong> 중급 01에서 각자 만든 계정 지침이 무력화됩니다.</p>
+    </div>
+
+    <h3>4-2. 조직 지침에 담기 좋은 것</h3>
+    <p>공식 문서가 드는 용도는 <strong>커뮤니케이션 표준, 형식 요구, 컴플라이언스 안내, 조직 전체에 필요한 도메인 맥락</strong>입니다. <span class="src">(출처: support.claude.com/en/articles/14546867, 2026-08-26 확인)</span> 문서의 예시를 성격별로 정리하면 이렇습니다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>성격</th><th>공식 문서의 예시 (취지)</th><th>조직 지침에</th></tr></thead>
+        <tbody>
+          <tr><th>팀 정체성</th><td>"우리 제품"이 무엇을 뜻하는지 정의</td><td><strong>적합</strong> — 모두에게 같음</td></tr>
+          <tr><th>도메인 맥락</th><td>"클레임"이 보험 청구를 뜻한다고 정의</td><td><strong>적합</strong> — 용어 혼동을 막음</td></tr>
+          <tr><th>안내 경로</th><td>인사 정책 질문은 담당 메일로 안내하게 함</td><td><strong>적합</strong> — 잘못된 답을 막음</td></tr>
+          <tr><th>데이터 취급 주의</th><td>다룰 수 없는 정보에 대한 주의</td><td><strong>적합</strong> — 컴플라이언스</td></tr>
+          <tr><th>커뮤니케이션 표준</th><td>격식·능동태·이모지 금지 등</td><td><strong>주의</strong> — 개인 지침을 덮음(4-1)</td></tr>
+          <tr><th>응답 형식</th><td>분량 제한, 목록 형식 등</td><td><strong>주의</strong> — 작업에 따라 방해가 됨</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="code-caption">앞 넷은 <strong>정보</strong>를 주고, 뒤 둘은 <strong>취향</strong>을 강제합니다. 정보는 모두에게 참이고 취향은 사람마다 다릅니다. <strong>배포 우선순위를 이 순서로</strong> 잡는 것이 안전합니다.</p>
+
+    <h3>4-3. 확산 범위는 다섯 층입니다</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>층</th><th>영향 범위</th><th>되돌리기</th></tr></thead>
+        <tbody>
+          <tr><td>① 나만</td><td>내 계정</td><td>즉시, 혼자</td></tr>
+          <tr><td>② 프로젝트 공유</td><td>그 프로젝트 구성원</td><td>쉬움</td></tr>
+          <tr><td>③ 스킬 공유</td><td>지정한 동료·그룹</td><td>쉬움</td></tr>
+          <tr><td>④ 조직 스킬 프로비저닝</td><td>조직 전체 사용자</td><td>Owner만</td></tr>
+          <tr><td>⑤ 조직 지침</td><td><strong>조직 전체 모든 대화</strong></td><td><strong>Admin 이상만. 개인은 우회 불가</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="code-caption">Team·Enterprise에서는 스킬을 동료·그룹·조직과 공유할 수 있고, 조직 프로비저닝 스킬은 Owner가 전체 사용자에게 배포합니다. <span class="src">(출처: support.claude.com/en/articles/12512176 및 12512180, 2026-08-26 확인)</span> <strong>층이 올라갈수록 되돌리기가 어려워집니다</strong> — 이것이 단계별 확산의 근거입니다.</p>
+
+    <h3>4-4. 한 번에 전부 배포하지 않습니다</h3>
+    <div class="callout callout-tip">
+      <span class="callout-title">공식 가이드가 파도 방식을 권합니다</span>
+      <p>Enterprise 사용량 가이드는 이렇게 경고합니다 — <strong>첫날 모두에게 모든 기능을 열어 주는 것이 예상치 못한 소비를 만드는 가장 빠른 길</strong>이며, 사용 강도가 높은 기능은 <strong>파도(wave)로 나눠 배포</strong>하되 <strong>생산적으로 쓸 가능성이 가장 높은 팀부터</strong> 시작하라고 합니다. <span class="src">(출처: support.claude.com/en/articles/14782391, 2026-08-26 확인)</span></p>
+      <p>같은 원리가 지침·스킬 배포에도 적용됩니다. <strong>가장 잘 쓸 팀에 먼저 주고, 그 팀에서 나온 문제를 고친 뒤 다음 파도로</strong> 넘어갑니다.</p>
+    </div>
+
+    <h3>4-5. 사용량 통제를 함께 설계합니다</h3>
+    <p>지침과 스킬이 배포되면 <strong>사용량이 늘어납니다.</strong> 조직 지침은 모든 대화에 실리고, 스킬은 예시까지 담고 있기 때문입니다(상급 03의 4-2).</p>
+    <p>Enterprise에서는 <strong>조직·그룹·개인 세 수준에서 지출 한도</strong>를 설정할 수 있습니다. 공식 가이드의 운영 권고가 구체적입니다 — <strong>초기 배포 중에는 주간, 이후에는 월간으로 그룹 소비를 검토</strong>하고, 어떤 그룹이 계속 한도에 가까워지면 <strong>자동으로 한도를 올리기 전에 원인을 조사</strong>하라고 합니다. 올바른 대응이 예산 증액이 아니라 <strong>모델 안내</strong>일 수 있기 때문입니다. <span class="src">(출처: support.claude.com/en/articles/14782391, 2026-08-26 확인)</span></p>
+    <div class="callout callout-tip">
+      <span class="callout-title">부서마다 담당자를 두는 방식</span>
+      <p>같은 가이드는 <strong>각 부서에 "그룹 오너"를 지정</strong>해 사용량 검토와 질문 응대를 맡기라고 권합니다. <strong>관리 부담을 분산하고 업무 맥락을 아는 사람을 판단에 넣는</strong> 효과가 있습니다. <span class="src">(출처: support.claude.com/en/articles/14782391, 2026-08-26 확인)</span></p>
+      <p>이 역할이 상급 03의 <strong>자산 갱신 담당자</strong>와 자연스럽게 겹칩니다. 계획서에 함께 적으세요.</p>
+    </div>
+
+    <h3>4-6. 되돌리기가 계획서의 필수 항목입니다</h3>
+    <div class="callout callout-danger">
+      <span class="callout-title">개인이 우회할 수 없다는 것은 양날입니다</span>
+      <p>조직 지침은 개인 지침을 이기고, 커넥터의 읽기·쓰기 제한도 <strong>조직 전체에 적용되어 개인이 덮어쓸 수 없습니다</strong>(중급 04의 4-5). 보안 정책으로는 좋습니다.</p>
+      <p>그러나 <strong>잘못된 규칙을 배포하면 조직 전체가 막히고 각자는 손쓸 수 없습니다.</strong> 사고 시 <strong>누가 어떻게 끄는지</strong>가 정해져 있지 않으면 그 시간 동안 조직 전체가 멈춥니다.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>계획서에 반드시 들어갈 것</th><th>왜</th></tr></thead>
+        <tbody>
+          <tr><td>되돌릴 권한을 가진 사람 <strong>2명 이상</strong></td><td>1명이면 그 사람이 자리에 없을 때 못 끕니다</td></tr>
+          <tr><td>되돌리는 <strong>구체적 절차</strong></td><td>"관리자에게 문의"는 절차가 아닙니다</td></tr>
+          <tr><td>되돌린 뒤 <strong>반영까지 걸리는 시간</strong></td><td>즉시가 아니면 그동안의 대응이 필요합니다</td></tr>
+          <tr><td>이전 버전 <strong>보관 위치</strong></td><td>지침 전문을 잃으면 복구가 아니라 재작성이 됩니다</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="code-caption">조직 지침은 <strong>최대 3,000자</strong>까지 쓸 수 있고, <strong>변경 사항이 적용되는 데 최대 1시간</strong>이 걸릴 수 있습니다. 공식 문서와 실제 관리 화면(<span class="path">조직 및 액세스 → 조직 지침</span>)의 안내 문구가 같은 값을 말합니다. <span class="src">(출처: support.claude.com/en/articles/14546867, 2026-08-26 확인 — Primary Owner 권한 계정으로 관리 화면 직접 확인)</span> 세 번째 항목("반영까지 걸리는 시간")은 이 값을 기본으로 적되, 되돌리기도 지침을 바꾸는 것이므로 같은 지연이 적용된다고 보고 계획하세요.</p>
+
+    <h3>4-7. Claude Code에서 달라지는 것</h3>
+    <div class="callout callout-info">
+      <span class="callout-title">강제력의 구조가 같습니다</span>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>claude.ai</th><th>Claude Code</th></tr></thead>
+          <tbody>
+            <tr><td>조직이 강제하는 것</td><td>조직 지침</td><td><a href="code_advanced_01_hooks-guard.html">관리 정책 설정의 훅·권한</a> (상급 01)</td></tr>
+            <tr><td>개인이 끌 수 있는가</td><td><strong>불가</strong></td><td><strong>불가</strong> — 관리 설정 수준에서만</td></tr>
+            <tr><td>조직이 배포하는 절차</td><td>조직 스킬 프로비저닝</td><td><a href="code_advanced_05_automation-rollout.html">플러그인·관리 설정</a> (상급 05)</td></tr>
+            <tr><td>자동 점검 수단</td><td><strong>없음</strong></td><td><a href="code_advanced_04_handover-system.html">점검 스크립트 + 훅</a> (상급 04)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>마지막 줄이 실무에서 갈립니다. Claude Code는 <strong>배포한 것이 살아 있는지 자동으로 확인</strong>할 수 있지만, claude.ai에는 그런 수단이 없습니다. 그래서 <strong>계획서의 검토 주기가 유일한 점검 장치</strong>입니다(4-5).</p>
+    </div>
+  </div>
+
+  <h2>5. 단계별 실습</h2>
+
+  <div class="section practice">
+    <span class="section-kind">실습</span>
+
+    <p><strong>만들 결과물:</strong> 조직 표준 배포 계획서 1건 — 확산 범위, 파도 순서, 사용량 통제, 되돌리기 절차, 위험 평가를 포함합니다.</p>
+
+    <ol class="steps">
+
+      <li>
+        <span class="step-title">확산 후보를 펼칩니다</span>
+        <p>상급 03의 10단계에서 만든 <strong>자산 목록</strong>을 엽니다. 각 항목이 확산 후보입니다.</p>
+        <p>여기에 Claude 중급에서 만든 것도 포함됩니다 — 계정 지침, 회의록 스킬, 프로젝트 지식, 문의 분류 스킬.</p>
+      </li>
+
+      <li>
+        <span class="step-title">"정보"와 "취향"으로 가릅니다</span>
+        <p>4-2의 기준을 적용합니다. <strong>이 구분이 이 모듈에서 가장 중요한 판단</strong>입니다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>내 자산</th><th>정보인가 취향인가</th><th>근거</th></tr></thead>
+            <tbody>
+              <tr><td>(자산 이름)</td><td>정보 / 취향</td><td>모두에게 참인가?</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>취향으로 분류된 것은 조직 지침 후보에서 뺍니다.</strong> 스킬로 배포하면 쓰고 싶은 사람만 씁니다.</p>
+      </li>
+
+      <li>
+        <span class="step-title">개인 지침과 충돌할 지점을 예측합니다</span>
+        <p>4-1의 우선순위 규칙 때문에 <strong>조직 지침이 이깁니다.</strong> 그러므로 배포 전에 <strong>누구의 무엇이 무력화되는지</strong> 알아야 합니다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>배포 후보 항목</th><th>충돌할 개인 지침</th><th>영향받는 직무</th></tr></thead>
+            <tbody>
+              <tr><td>(예) "격식 있는 문체로"</td><td>"편하게 써 달라"</td><td>사내 캐주얼 공지 담당</td></tr>
+              <tr><td>(예) "300자 이내로"</td><td>"자세히 설명해 달라"</td><td>교육 자료 작성 담당</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>충돌이 예상되는 항목은 <strong>조직 지침이 아니라 스킬로</strong> 내리세요.</p>
+
+        <div class="checkpoint">
+          <span class="checkpoint-title">여기까지 — 무엇을 올릴 것인가</span>
+          <ul>
+            <li>자산을 <strong>정보와 취향</strong>으로 갈랐다</li>
+            <li>취향은 조직 지침 후보에서 뺐다</li>
+            <li>남은 것에 대해 <strong>누구의 무엇이 무력화되는지</strong> 적었다</li>
+          </ul>
+          <p>충돌 표가 비어 있다면 예측이 부족한 것입니다. <strong>조직에는 나와 다르게 일하는 사람이 반드시 있습니다.</strong></p>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">확산 범위를 정합니다</span>
+        <p>4-3의 다섯 층 중 하나를 각 항목에 배정합니다. <strong>가장 낮은 층에서 목적이 달성되면 그것으로 끝냅니다.</strong></p>
+        <p>조직 지침(⑤)은 <strong>다른 층으로는 안 되는 것만</strong> 올립니다. 되돌리기가 가장 어렵기 때문입니다.</p>
+      </li>
+
+      <li>
+        <span class="step-title">파도 순서를 정합니다</span>
+        <p>4-4의 공식 권고대로 나눕니다. <strong>가장 잘 쓸 팀부터</strong>입니다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>파도</th><th>대상</th><th>기간</th><th>다음 파도로 넘어갈 조건</th></tr></thead>
+            <tbody>
+              <tr><td>1차</td><td>(가장 잘 쓸 팀)</td><td>(2주 등)</td><td>(무엇이 확인되면)</td></tr>
+              <tr><td>2차</td><td>(인접 팀)</td><td></td><td></td></tr>
+              <tr><td>3차</td><td>(조직 전체)</td><td></td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>"다음 파도로 넘어갈 조건"이 비어 있으면 파도가 아니라 그냥 지연</strong>입니다. 무엇을 보고 판단할지 정하세요.</p>
+      </li>
+
+      <li>
+        <span class="step-title">각 파도의 확인 항목을 정합니다</span>
+        <p>무엇이 잘못되고 있는지 <strong>관찰 가능한 신호</strong>로 적습니다. 상급 03의 프롬프트 B와 같은 원칙입니다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>확인할 것</th><th>관찰 가능한 신호</th></tr></thead>
+            <tbody>
+              <tr><td>정당한 작업이 방해받는가</td><td>"지침 때문에 안 된다"는 문의 건수</td></tr>
+              <tr><td>사용량이 늘었는가</td><td>그룹 소비의 주간 추이(4-5)</td></tr>
+              <tr><td>실제로 쓰이는가</td><td>배포한 스킬의 호출 여부</td></tr>
+              <tr><td>내용이 맞는가</td><td>답변에서 발견된 오류 사례</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">사용량 통제를 설계합니다</span>
+        <p>4-5의 공식 권고를 우리 상황에 적용합니다.</p>
+        <ul>
+          <li>한도를 어느 수준에 둘 것인가 (조직 / 그룹 / 개인)</li>
+          <li>검토 주기 — 초기 주간, 이후 월간</li>
+          <li>한도에 가까워졌을 때 <strong>증액 전에 무엇을 조사할 것인가</strong></li>
+          <li>부서별 그룹 오너를 둘 것인가, 누구로 할 것인가</li>
+        </ul>
+        <p class="code-caption">네 번째가 상급 03의 자산 갱신 담당자와 겹칩니다(4-5). <strong>같은 사람으로 묶는 것</strong>이 관리 부담을 줄입니다.</p>
+      </li>
+
+      <li>
+        <span class="step-title">되돌리기 절차를 정합니다</span>
+        <p>4-6의 네 항목을 채웁니다. <strong>비어 있으면 계획서가 아닙니다.</strong></p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>항목</th><th>우리 경우</th></tr></thead>
+            <tbody>
+              <tr><td>되돌릴 권한자 (2명 이상)</td><td>(이름·역할)</td></tr>
+              <tr><td>되돌리는 절차</td><td>(어느 화면에서 무엇을)</td></tr>
+              <tr><td>반영까지 걸리는 시간</td><td>(기본값 최대 1시간 — 배포 시점에 담당자가 재확인)</td></tr>
+              <tr><td>이전 버전 보관 위치</td><td>(어디에 전문을 보관하는가)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="checkpoint">
+          <span class="checkpoint-title">여기까지 — 어떻게 올릴 것인가</span>
+          <ul>
+            <li>각 항목에 <strong>다섯 층 중 하나</strong>를 배정했다</li>
+            <li>파도마다 <strong>넘어갈 조건</strong>이 적혀 있다</li>
+            <li>확인 항목이 <strong>관찰 가능한 신호</strong>다</li>
+            <li>되돌리기 네 항목이 <strong>모두 채워졌다</strong></li>
+          </ul>
+          <p>되돌리기 권한자가 1명이면 멈추세요. <strong>그 사람이 휴가일 때 조직 전체가 막힙니다.</strong></p>
+        </div>
+      </li>
+
+      <li>
+        <span class="step-title">계획서로 정리합니다 (프롬프트 A)</span>
+        <p>2~8단계의 표를 <a href="#prompt-a">프롬프트 A</a>로 하나의 문서로 만듭니다. <code>docs/ROLLOUT-PLAN.md</code>나 사내 문서 도구에 저장하세요.</p>
+      </li>
+
+      <li>
+        <span class="step-title">위험 평가를 덧붙입니다 (프롬프트 B)</span>
+        <p><a href="#prompt-b">프롬프트 B</a>로 다섯 가지 실패 유형을 우리 상황에 적용합니다. Claude Code 상급 05와 같은 구조이며, <strong>항목만 claude.ai 기준</strong>으로 바꿨습니다.</p>
+      </li>
+
+      <li>
+        <span class="step-title">계획서를 검토받고 마칩니다 (프롬프트 C)</span>
+        <p><a href="#prompt-c">프롬프트 C</a>로 계획서의 빈 곳을 찾습니다. 상급 01의 프롬프트 C와 같은 방식입니다 — <strong>만든 것을 검토받는 습관</strong>입니다.</p>
+        <p>지적을 반영하면 <strong>권한을 가진 담당자에게 제출할 수 있는 상태</strong>가 됩니다.</p>
+
+        <div class="checkpoint">
+          <span class="checkpoint-title">여기까지 — 코스 종료</span>
+          <ul>
+            <li>계획서에 확산 범위·파도·확인 항목·사용량 통제·되돌리기가 모두 있다</li>
+            <li>다섯 가지 실패 유형이 우리 상황으로 평가됐다</li>
+            <li>검토 지적을 반영했다</li>
+          </ul>
+          <p>이것으로 Claude 상급 코스가 끝납니다. 중급에서 만든 자산이 상급에서 검증되고 자산화되어, 이제 조직으로 올릴 준비가 됐습니다.</p>
+        </div>
+      </li>
+
+    </ol>
+  </div>
+
+  <h2>6. 예제 코드·예제 프롬프트</h2>
+
+  <div class="section practice">
+    <span class="section-kind">실습 자료</span>
+
+    <div class="callout callout-info">
+      <span class="callout-title">응답은 매번 다릅니다</span>
+      <p>아래 "예상 출력"은 <strong>응답 예시</strong>입니다. 성공 여부는 문구가 아니라 <strong>필요한 항목이 빠짐없이 채워졌는지</strong>로 판단합니다.</p>
+    </div>
+
+    <h3 id="prompt-a">프롬프트 A — 배포 계획서 정리</h3>
+    <p><strong>사전 준비물:</strong> 2~8단계에서 채운 표들. 상급 03의 자산 목록.</p>
+    <div class="code-label">실행할 프롬프트 전문 (괄호를 본인 내용으로 채우세요)</div>
+<pre><code>제가 만든 Claude 자산을 조직 표준으로 올리는 계획서를 정리해 주세요.
+지금 어떤 설정도 바꾸지 마세요. 문서만 만들어 주세요.
+
+[확산 후보]
+(상급 03의 자산 목록을 붙여 넣으세요)
+
+[제가 정한 것]
+- 정보/취향 구분: (2단계 결과)
+- 예상되는 개인 지침 충돌: (3단계 결과)
+- 항목별 확산 범위: (4단계 결과)
+- 파도 순서와 넘어갈 조건: (5단계 결과)
+- 파도별 확인 신호: (6단계 결과)
+- 사용량 통제: (7단계 결과)
+- 되돌리기 절차: (8단계 결과)
+
+[계획서에 담을 구성]
+1. 요약 — 무엇을 왜 배포하는가 (3줄 이내)
+2. 배포 대상과 확산 범위 (표)
+3. 파도별 계획 — 대상·기간·넘어갈 조건·확인 신호 (표)
+4. 사용량 통제와 검토 주기
+5. 되돌리기 절차 — 권한자 2명 이상, 절차, 반영 시간, 이전 버전 보관
+6. 승인 요청 사항 — 권한을 가진 담당자가 결정해야 할 것
+
+제가 주지 않은 내용은 지어내지 마세요.
+비어 있는 항목은 "확인 필요"로 표시해 주세요.</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> 여섯 절로 구성된 계획서가 나옵니다. 제가 채우지 않은 항목은 "확인 필요"로 표시됩니다.</p>
+    <p><strong>성공 확인 방법:</strong> 아래 3가지가 맞으면 성공입니다.</p>
+    <ul class="checklist">
+      <li><input type="checkbox" id="b1"><label for="b1">6개 절이 모두 있다</label></li>
+      <li><input type="checkbox" id="b2"><label for="b2">5번의 <strong>권한자가 2명 이상</strong>이거나 "확인 필요"로 표시됐다</label></li>
+      <li><input type="checkbox" id="b3"><label for="b3">내가 주지 않은 내용을 <strong>지어내지 않았다</strong></label></li>
+    </ul>
+
+    <h3 id="prompt-b">프롬프트 B — 위험 평가</h3>
+    <p><strong>사전 준비물:</strong> 프롬프트 A를 실행한 <strong>같은 대화</strong>.</p>
+    <div class="code-label">실행할 프롬프트 전문</div>
+<pre><code>방금 계획서에 위험 평가를 덧붙여 주세요.
+
+아래 다섯 가지 실패 유형에 대해 각각
+"우리 경우 해당하는가 / 근거 / 대비책"을 적어 주세요.
+
+1. 조직 지침이 개인 지침을 덮어 특정 직무의 업무를 방해함
+2. 취향에 해당하는 규칙을 조직 지침으로 올려 불만이 쌓임
+3. 한 번에 전체 배포해 문제를 조기에 발견하지 못함
+4. 배포 후 검토 주기가 없어 낡은 지침이 계속 강제됨
+5. 되돌릴 사람이 자리에 없어 사고 시간이 길어짐
+
+마지막에 "배포를 미뤄야 하는 조건"을 별도 절로 적어 주세요.
+어떤 항목이 준비되지 않았으면 배포하지 말아야 하는지 판단 기준입니다.</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> 다섯 유형의 평가와 "배포를 미뤄야 하는 조건" 절이 나옵니다. 1번은 3단계의 충돌 표가 근거로 잡히는 것이 자연스럽습니다.</p>
+    <p><strong>성공 확인 방법:</strong> 아래 2가지가 맞으면 성공입니다.</p>
+    <ul class="checklist">
+      <li><input type="checkbox" id="b4"><label for="b4">각 항목에 <strong>우리 상황의 근거</strong>가 있다 (일반론이 아니라)</label></li>
+      <li><input type="checkbox" id="b5"><label for="b5">"배포를 미뤄야 하는 조건"이 <strong>판정 가능하게</strong> 적혀 있다</label></li>
+    </ul>
+
+    <h3 id="prompt-c">프롬프트 C — 계획서 검토받기</h3>
+    <p><strong>사전 준비물:</strong> 프롬프트 A·B로 완성한 계획서. <strong>새 대화</strong>에서 실행합니다.</p>
+    <div class="code-label">실행할 프롬프트 전문 (마지막에 계획서 전문을 붙여 넣으세요)</div>
+<pre><code>아래는 Claude 자산을 조직에 배포하는 계획서입니다.
+실행하지 말고 계획서 자체를 검토해 주세요.
+
+검토 항목:
+1. 조직 지침으로 올리기로 한 것 중, 실은 스킬로 내려야 할 것
+   (모두에게 참인 정보가 아니라 개인 취향인 것)
+2. 파도별 "넘어갈 조건"이 판정 불가능하게 적힌 부분
+3. 확인 신호가 관찰 불가능하게 적힌 부분
+4. 되돌리기 절차에서 실제로 실행하기 어려운 부분
+5. 계획서에 아예 빠진 항목
+
+각 항목에 어느 부분이 문제인지 짚고 고친 문장을 제시해 주세요.
+문제가 없으면 "없음"이라고 적어 주세요.
+
+---
+(여기에 계획서 전문을 붙여 넣으세요)</code></pre>
+    <p><strong>예상 출력(응답 예시):</strong> 다섯 항목별 지적과 대안 문장이 나옵니다.</p>
+    <p><strong>성공 확인 방법:</strong> 아래 2가지가 맞으면 성공입니다.</p>
+    <ul class="checklist">
+      <li><input type="checkbox" id="b6"><label for="b6">지적마다 <strong>계획서의 어느 부분</strong>인지 짚었다</label></li>
+      <li><input type="checkbox" id="b7"><label for="b7">1번 지적을 <strong>실제로 반영</strong>해 조직 지침 목록을 줄였다 (지적이 있었다면)</label></li>
+    </ul>
+    <p class="code-caption">두 번째가 중요합니다. 조직 지침 목록이 줄어드는 것은 <strong>후퇴가 아니라 개선</strong>입니다 — 되돌리기가 가장 어려운 층을 최소로 유지하는 것이 목표입니다(4-3).</p>
+  </div>
+
+  <h2>7. 트러블슈팅</h2>
+
+  <div class="section">
+    <span class="section-kind">설명</span>
+    <p>이 모듈은 배포를 실행하지 않으므로, 아래는 <strong>실제 배포를 진행하는 담당자를 위한 예상 문제</strong>입니다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>증상</th><th>원인</th><th>해결</th></tr></thead>
+        <tbody>
+          <tr>
+            <th>구성원이 "내 지침이 안 먹는다"고 한다</th>
+            <td>조직 지침이 개인 지침을 덮음</td>
+            <td>정상 동작입니다(4-1). 그 항목이 <strong>취향에 해당하는지</strong> 재검토하고, 맞으면 조직 지침에서 내려 스킬로 배포합니다.</td>
+          </tr>
+          <tr>
+            <th>조직 지침을 설정할 메뉴가 없다</th>
+            <td>권한 부족 또는 플랜</td>
+            <td>Team·Enterprise의 <strong>Admin 이상</strong>만 설정할 수 있습니다(3-3). Pro·Max에는 이 기능이 없습니다.</td>
+          </tr>
+          <tr>
+            <th>배포한 스킬을 아무도 쓰지 않는다</th>
+            <td><code>description</code>이 구성원의 표현과 다름</td>
+            <td>중급 02의 7번 절과 같습니다. <strong>구성원이 실제로 쓸 표현</strong>을 넣어야 자동으로 불립니다.</td>
+          </tr>
+          <tr>
+            <th>사용량이 예상보다 크게 늘었다</th>
+            <td>조직 지침이 모든 대화에 실리고 스킬이 예시까지 담음</td>
+            <td>4-5의 검토 절차를 따릅니다. <strong>증액 전에 원인을 조사</strong>하고, 지침 분량과 예시 개수를 먼저 점검합니다.</td>
+          </tr>
+          <tr>
+            <th>변경했는데 바로 반영되지 않는다</th>
+            <td>정상입니다 — 반영에 <strong>최대 1시간</strong>이 걸릴 수 있음</td>
+            <td>공식 문서와 관리 화면 모두 변경 사항 적용까지 최대 1시간이 걸릴 수 있다고 안내합니다(4-6). <strong>1시간이 지나도</strong> 반영되지 않으면 그때 담당자에게 문의하세요.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>7-2. 흔한 잘못된 습관</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>습관</th><th>겉으로 나타나는 모습</th><th>대응</th></tr></thead>
+        <tbody>
+          <tr>
+            <th>내게 좋았던 것을 그대로 조직에 올린다</th>
+            <td>검증된 것이라 안전해 보임. <strong>내 직무에만 맞는 취향</strong>이 전원에게 강제됨</td>
+            <td>정보와 취향을 가릅니다(4-2). <strong>내 검증은 내 업무에 대한 검증</strong>일 뿐입니다.</td>
+          </tr>
+          <tr>
+            <th>한 번에 전체 배포한다</th>
+            <td>빠르게 표준화됨. 문제를 조기에 발견하지 못하고 전원이 겪음</td>
+            <td>파도로 나눕니다(4-4). <strong>가장 잘 쓸 팀부터</strong>가 공식 권고입니다.</td>
+          </tr>
+          <tr>
+            <th>되돌리기 권한자를 1명만 둔다</th>
+            <td>관리가 단순해 보임. 그 사람이 자리에 없으면 <strong>조직 전체가 막힌 채 대기</strong></td>
+            <td>2명 이상을 지정합니다(4-6). 되돌리기는 <strong>가장 급할 때 필요한 절차</strong>입니다.</td>
+          </tr>
+          <tr>
+            <th>배포하고 검토 주기를 안 정한다</th>
+            <td>초기에는 잘 돌아감. 낡은 지침이 조직 전체에 강제되는 상태로 방치됨</td>
+            <td>claude.ai에는 자동 점검 수단이 없습니다(4-7). <strong>검토 주기가 유일한 장치</strong>입니다.</td>
+          </tr>
+          <tr>
+            <th>조직 지침을 계속 늘린다</th>
+            <td>표준이 촘촘해 보임. 모든 대화의 비용이 커지고 지시끼리 충돌함</td>
+            <td>다른 층으로 되는 것은 내립니다(4-3). <strong>조직 지침은 최소로 유지</strong>합니다.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>8. 확인 체크리스트</h2>
+
+  <div class="section">
+    <span class="section-kind">자가 점검</span>
+    <p>이 모듈로 Claude 상급 코스가 끝납니다.</p>
+    <ul class="checklist">
+      <li><input type="checkbox" id="c1"><label for="c1">조직 지침이 개인 지침을 <strong>이긴다</strong>는 점과 그것이 만드는 위험을 설명할 수 있다.</label></li>
+      <li><input type="checkbox" id="c2"><label for="c2">자산을 <strong>정보와 취향</strong>으로 갈라 조직 지침 후보를 줄였다.</label></li>
+      <li><input type="checkbox" id="c3"><label for="c3">파도마다 <strong>넘어갈 조건</strong>과 관찰 가능한 확인 신호를 정했다.</label></li>
+      <li><input type="checkbox" id="c4"><label for="c4">되돌리기 네 항목을 채웠고 <strong>권한자가 2명 이상</strong>이다.</label></li>
+      <li><input type="checkbox" id="c5"><label for="c5">계획서를 검토받아 <strong>조직 지침 목록을 줄였다</strong>(또는 줄일 것이 없음을 확인했다).</label></li>
+    </ul>
+  </div>
+
+  <h2>9. 필요 캡처 목록</h2>
+
+  <div class="section">
+    <span class="section-kind">작성자용</span>
+    <p><strong>이 모듈에는 캡처가 없습니다.</strong> 관리자 화면을 실습하지 않기 때문입니다(3-3).</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>번호</th><th>화면</th><th>진입 경로</th><th>캡처 범위</th><th>강조 표시</th><th>캡션</th></tr></thead>
+        <tbody>
+          <tr><td class="mod-no">—</td><td colspan="5">해당 없음. 관리자 권한이 필요한 화면이라 학습자가 재현할 수 없습니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout callout-warn">
+      <span class="callout-title">권한을 가진 담당자가 배포를 진행할 때</span>
+      <p>조직 지침 설정 화면과 조직 스킬 프로비저닝 화면을 캡처해 두면 <strong>다음 담당자에게 인계할 때</strong> 값어치가 큽니다. 다만 그 화면에는 <strong>실제 조직 지침 전문과 배포된 스킬 목록</strong>이 찍히므로, 사내 배포용으로만 쓰고 외부에 공유하지 마세요. 글자 수 제한(3,000자)과 반영 시간(최대 1시간, 4-6)은 2026-08-26 기준 확인값이니, 캡처할 때 관리 화면에 표시된 값이 그대로인지 함께 확인하세요.</p>
+    </div>
+  </div>
+
+  <h2>10. 참고 자료</h2>
+
+  <ul class="reflist">
+    <li>Set organization instructions (Anthropic Help Center) — <code>https://support.claude.com/en/articles/14546867-set-organization-instructions</code> <span class="ref-date">2026-08-26 확인</span></li>
+    <li>Claude Enterprise consumption guide (Anthropic Help Center) — <code>https://support.claude.com/en/articles/14782391-claude-enterprise-consumption-guide</code> <span class="ref-date">2026-08-26 확인</span></li>
+    <li>What are skills? (Anthropic Help Center) — <code>https://support.claude.com/en/articles/12512176-what-are-skills</code> <span class="ref-date">2026-08-26 확인</span></li>
+    <li>Use skills in Claude (Anthropic Help Center) — <code>https://support.claude.com/en/articles/12512180-use-skills-in-claude</code> <span class="ref-date">2026-08-26 확인</span></li>
+    <li>Manage members on Team and Enterprise plans (Anthropic Help Center) — <code>https://support.claude.com/en/articles/13133750-manage-members-on-team-and-enterprise-plans</code> <span class="ref-date">2026-08-26 확인</span></li>
+    <li>claude.ai 관리 콘솔 직접 확인 (Ho Tech 조직, Primary Owner 권한 계정 — 조직 지침·조직 스킬·사용량 및 지출 한도·결제 화면) — <code>claude.ai/admin-settings/organization, /admin-settings/skills, /admin-settings/usage, /admin-settings/billing</code> <span class="ref-date">2026-08-26 확인</span></li>
+  </ul>
+
+  <div class="callout callout-info">
+    <span class="callout-title">사실 확인 기준</span>
+    <p>조직 지침이 <strong>Team·Enterprise의 Admin·Owner·Primary Owner</strong>만 설정할 수 있다는 점, 조직 전체 모든 대화에 적용된다는 점, <strong>개인 지침과 충돌하면 조직 지침이 우선</strong>한다는 점과 그 공식 예시, 담기 좋은 용도(커뮤니케이션 표준·형식·컴플라이언스·도메인 맥락), <strong>글자 수 제한(3,000자)과 반영 시간(최대 1시간)</strong>을 공식 조직 지침 문서로 확인했습니다. 역할 체계(Primary Owner·Owner·Admin·Member, Enterprise는 Custom 역할 추가)는 별도의 공식 멤버 관리 문서로 확인했습니다. <strong>파도로 나눠 배포하고 가장 잘 쓸 팀부터 시작하라는 권고</strong>, 조직·그룹·개인 세 수준의 지출 한도, <strong>초기 주간·이후 월간 검토</strong>와 증액 전 원인 조사 권고, 부서별 그룹 오너 지정을 Enterprise 사용량 가이드로 확인했습니다. 스킬 공유와 조직 프로비저닝은 공식 스킬 문서로 확인했습니다. 이번 확인 시점에 검수 계정이 해당 조직의 <strong>Primary Owner 권한</strong>을 가지고 있어, 조직 지침 화면·조직 스킬 프로비저닝 화면·사용량 및 지출 한도 화면(조직·시트·개인 단위)을 관리 콘솔에서 직접 열어 문서 내용과 대조했습니다.</p>
+    <p><strong>실사용 확인의 한계:</strong> 대조에 쓴 조직은 <strong>Team 플랜</strong>이어서, Enterprise 전용 요소(그룹 단위 RBAC 지출 한도 등)는 화면으로 직접 열어보지 못했고 Enterprise 사용량 가이드 문서로만 확인했습니다. 관리 화면에서 실제로 변경·저장하는 조작은 다른 조직 구성원에게 영향을 주므로 수행하지 않았습니다 — 화면 존재 여부와 안내 문구만 확인했습니다. 배포 계획서의 구성과 다섯 가지 실패 유형은 <strong>이 커리큘럼이 정한 설계</strong>이며 제품 기능이 아닙니다.</p>
+  </div>
+
+  <div class="doc-footer">
+    <span>Claude · 상급 · 모듈 04 (claude_advanced_04_org-rollout.html)</span>
+    <span class="checked-date">최종 확인일: 2026-08-26</span>
+  </div>
+
+</div>
+</div><!-- /.layout -->
+
+<script>
+(function(){
+  var COURSES = [{"id":"claude-basic","product":"Claude","track":"basic","trackLabel":"초급","status":"done","modules":[{"no":"01","file":"claude_basic_01_first-chat.html","title":"접속과 첫 대화, 프롬프트 기초"},{"no":"02","file":"claude_basic_02_interface-and-chats.html","title":"화면 구성과 대화 관리"},{"no":"03","file":"claude_basic_03_file-upload.html","title":"파일 업로드로 문서 질의하기"},{"no":"04","file":"claude_basic_04_model-and-effort.html","title":"모델 선택과 응답 조절"},{"no":"05","file":"claude_basic_05_artifacts.html","title":"아티팩트로 결과물 만들고 내보내기"}]},{"id":"cowork-basic","product":"Claude Cowork","track":"basic","trackLabel":"초급","status":"todo","modules":[]},{"id":"code-basic","product":"Claude Code","track":"basic","trackLabel":"초급","status":"done","modules":[{"no":"01","file":"code_basic_01_install-and-first-session.html","title":"설치와 첫 세션"},{"no":"02","file":"code_basic_02_permissions-and-safety.html","title":"권한 모드와 안전장치"},{"no":"03","file":"code_basic_03_first-change-and-commit.html","title":"첫 코드 변경과 커밋"},{"no":"04","file":"code_basic_04_claude-md.html","title":"CLAUDE.md로 프로젝트 컨텍스트 남기기"},{"no":"05","file":"code_basic_05_project-structure.html","title":"Claude Code 폴더 구조 총정리"}]},{"id":"design-basic","product":"Claude Design","track":"basic","trackLabel":"초급","status":"todo","modules":[]},{"id":"claude-custom","product":"Claude","track":"custom","trackLabel":"중급","status":"done","modules":[{"no":"01","file":"claude_custom_01_instructions.html","title":"계정 전체 지침으로 반복 설명 없애기"},{"no":"02","file":"claude_custom_02_skills.html","title":"스킬(Skills)로 응답 방식과 반복 작업 저장하기"},{"no":"03","file":"claude_custom_03_projects.html","title":"프로젝트로 작업 공간 꾸리기"},{"no":"04","file":"claude_custom_04_connectors.html","title":"커넥터로 외부 도구 연결하기"},{"no":"05","file":"claude_custom_05_memory.html","title":"메모리와 이전 대화 활용하기"}]},{"id":"cowork-custom","product":"Claude Cowork","track":"custom","trackLabel":"중급","status":"todo","modules":[]},{"id":"code-custom","product":"Claude Code","track":"custom","trackLabel":"중급","status":"done","modules":[{"no":"01","file":"code_custom_01_codebase-recon.html","title":"기존 코드베이스 파악하기"},{"no":"02","file":"code_custom_02_settings-json.html","title":"settings.json으로 반복 승인 정리하기"},{"no":"03","file":"code_custom_03_skills.html","title":"스킬(Skills)로 반복 작업 저장하기"},{"no":"04","file":"code_custom_04_review-workflow.html","title":"코드 리뷰 워크플로 만들기"},{"no":"05","file":"code_custom_05_mcp.html","title":"MCP로 외부 도구 연결하기"}]},{"id":"design-custom","product":"Claude Design","track":"custom","trackLabel":"중급","status":"todo","modules":[]},{"id":"claude-advanced","product":"Claude","track":"advanced","trackLabel":"상급","status":"done","modules":[{"no":"01","file":"claude_advanced_01_structured-prompts.html","title":"구조화된 프롬프트 설계"},{"no":"02","file":"claude_advanced_02_examples-and-thinking.html","title":"예시와 사고 유도로 일관성 높이기"},{"no":"03","file":"claude_advanced_03_prompt-assets.html","title":"프롬프트를 재사용 자산으로 만들기"},{"no":"04","file":"claude_advanced_04_org-rollout.html","title":"조직 표준 배포 설계"}]},{"id":"cowork-advanced","product":"Claude Cowork","track":"advanced","trackLabel":"상급","status":"todo","modules":[]},{"id":"code-advanced","product":"Claude Code","track":"advanced","trackLabel":"상급","status":"done","modules":[{"no":"01","file":"code_advanced_01_hooks-guard.html","title":"훅으로 위험 경로 차단하기"},{"no":"02","file":"code_advanced_02_safety-net.html","title":"변경 안전망 — 현재 동작 박제와 자동 검증"},{"no":"03","file":"code_advanced_03_subagents.html","title":"서브에이전트로 컨텍스트와 권한 분리하기"},{"no":"04","file":"code_advanced_04_handover-system.html","title":"세션 인계 체계 운용하기"},{"no":"05","file":"code_advanced_05_automation-rollout.html","title":"무인 실행과 조직 표준 배포"}]},{"id":"design-advanced","product":"Claude Design","track":"advanced","trackLabel":"상급","status":"todo","modules":[]}];
+
+  var STATUS_LABEL = {done:'완료', writing:'작성 중', planned:'분할 확정', todo:'미착수'};
+  var currentFile = location.pathname.split('/').pop() || 'index.html';
+
+  var nav = document.getElementById('sidebarNav');
+  if(!nav) return;
+
+  /* 코스 아코디언 펼침 상태: 페이지를 이동해도 "지금 보는 모듈의 코스"를
+     자동으로 펼치지 않는다 — 오직 사용자가 직접 펼치거나 접은 이력만
+     기억한다. 아무 것도 편 적이 없으면 전부 접힌 채로 시작한다. */
+  var OPEN_STORAGE_KEY = 'curriculum-sidebar-open-courses';
+
+  function readOpenCourseIds(){
+    try{
+      var raw = window.localStorage.getItem(OPEN_STORAGE_KEY);
+      if(!raw) return [];
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    }catch(e){ return []; }
+  }
+  function writeOpenCourseIds(ids){
+    try{ window.localStorage.setItem(OPEN_STORAGE_KEY, JSON.stringify(ids)); }catch(e){}
+  }
+
+  var openCourseIds = readOpenCourseIds();
+
+  var html = '';
+  COURSES.forEach(function(course){
+    var isOpen = openCourseIds.indexOf(course.id) !== -1;
+    html += '<div class="sb-course' + (isOpen ? ' open' : '') + '" data-course="' + course.id + '">';
+    html += '<button type="button" class="sb-course-btn" data-status="' + course.status + '" aria-expanded="' + isOpen + '">';
+    html += '<span class="sb-caret" aria-hidden="true"></span>';
+    html += '<span class="sb-dot" title="' + (STATUS_LABEL[course.status]||course.status) + '"></span>';
+    html += '<span class="sb-course-name">' + course.product + ' · ' + course.trackLabel + '</span>';
+    html += '</button>';
+    if(course.modules.length){
+      html += '<ul class="sb-modules">';
+      course.modules.forEach(function(m){
+        var isCurrent = (m.file === currentFile);
+        html += '<li><a href="' + m.file + '"' + (isCurrent ? ' class="current" aria-current="page"' : '') + '>';
+        html += '<span class="sb-no">' + m.no + '</span>' + m.title;
+        html += '</a></li>';
+      });
+      html += '</ul>';
+    } else {
+      html += '<ul class="sb-modules"><li class="sb-empty">아직 모듈 없음</li></ul>';
+    }
+    html += '</div>';
+  });
+  nav.innerHTML = html;
+
+  nav.addEventListener('click', function(e){
+    var btn = e.target.closest('.sb-course-btn');
+    if(!btn) return;
+    var courseEl = btn.closest('.sb-course');
+    var courseId = courseEl.getAttribute('data-course');
+    var willOpen = !courseEl.classList.contains('open');
+    courseEl.classList.toggle('open', willOpen);
+    btn.setAttribute('aria-expanded', String(willOpen));
+
+    var ids = readOpenCourseIds();
+    var idx = ids.indexOf(courseId);
+    if(willOpen && idx === -1) ids.push(courseId);
+    if(!willOpen && idx !== -1) ids.splice(idx, 1);
+    writeOpenCourseIds(ids);
+  });
+
+  /* 현재 모듈이 속한 코스가 (사용자 조작으로) 이미 펼쳐져 있는 경우에만
+     사이드바 내부를 스크롤해 보여준다 — 접혀 있으면 건드리지 않는다. */
+  var currentLink = nav.querySelector('a.current');
+  var sidebarEl = document.getElementById('courseSidebar');
+  if(currentLink && sidebarEl && currentLink.closest('.sb-course.open')){
+    var linkTop = currentLink.offsetTop;
+    var linkBottom = linkTop + currentLink.offsetHeight;
+    var viewTop = sidebarEl.scrollTop;
+    var viewBottom = viewTop + sidebarEl.clientHeight;
+    if(linkTop < viewTop || linkBottom > viewBottom){
+      sidebarEl.scrollTop = Math.max(0, linkTop - sidebarEl.clientHeight / 2);
+    }
+  }
+
+  /* --- topbar 왼쪽 햄버거 버튼 하나로 사이드바 표시를 제어.
+     데스크톱(960px 초과): 기본 표시, 버튼 클릭 시 숨김(폭 반환).
+     모바일(960px 이하): 기본 숨김(오버레이), 버튼 클릭 시 오버레이로 표시.
+     "다음/이전 모듈"로 페이지를 이동해도 직전에 선택한 표시 상태가
+     이어지도록 localStorage에 저장한다(파일마다 독립 실행되는 정적
+     페이지라 이 값 없이는 이동할 때마다 항상 기본 상태로 되돌아간다). */
+  var VISIBLE_STORAGE_KEY = 'curriculum-sidebar-visible';
+  var fab = document.getElementById('sbFab');
+  var backdrop = document.getElementById('sidebarBackdrop');
+  var mq = window.matchMedia('(max-width:960px)');
+
+  /* 모바일 topbar는 화면 폭에 따라 2~3줄로 접힐 수 있다. 고정 px 값 대신
+     실제 높이를 CSS 변수로 넘겨 사이드바 첫 항목이 topbar 뒤에 가려지지 않게 한다. */
+  function syncTopbarHeight(){
+    var topbar = document.querySelector('.topbar');
+    if(!topbar) return;
+    var h = Math.ceil(topbar.getBoundingClientRect().height);
+    document.documentElement.style.setProperty('--curriculum-topbar-height', h + 'px');
+  }
+
+  function readStoredVisible(){
+    try{
+      var v = window.localStorage.getItem(VISIBLE_STORAGE_KEY);
+      return v === null ? null : v === '1';
+    }catch(e){ return null; } /* 저장소 접근 불가 환경(파일 직접 열람 등) 대비 */
+  }
+  function writeStoredVisible(visible){
+    try{ window.localStorage.setItem(VISIBLE_STORAGE_KEY, visible ? '1' : '0'); }catch(e){}
+  }
+
+  function applyVisible(visible){
+    if(mq.matches){
+      document.body.classList.toggle('sidebar-open', visible);
+      document.body.classList.remove('sidebar-hidden');
+    } else {
+      document.body.classList.toggle('sidebar-hidden', !visible);
+      document.body.classList.remove('sidebar-open');
+    }
+    if(fab) fab.setAttribute('aria-expanded', String(visible));
+  }
+
+  syncTopbarHeight();
+  var stored = readStoredVisible();
+  var initialVisible = stored === null ? !mq.matches : stored;
+  applyVisible(initialVisible);
+
+  if(fab){
+    fab.addEventListener('click', function(){
+      var nowVisible = mq.matches
+        ? document.body.classList.contains('sidebar-open')
+        : !document.body.classList.contains('sidebar-hidden');
+      var next = !nowVisible;
+      applyVisible(next);
+      writeStoredVisible(next);
+    });
+  }
+  if(backdrop){
+    backdrop.addEventListener('click', function(){
+      applyVisible(false);
+      writeStoredVisible(false);
+    });
+  }
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && mq.matches && document.body.classList.contains('sidebar-open')){
+      applyVisible(false);
+      writeStoredVisible(false);
+    }
+  });
+  /* 데스크톱 <-> 모바일 경계를 넘나들며 화면 폭을 바꾸는 경우에도
+     저장된 선호에 맞춰 다시 계산 (모바일 오버레이 클래스와 데스크톱
+     폭-반환 클래스가 서로 섞이지 않도록) */
+  mq.addEventListener('change', function(){
+    syncTopbarHeight();
+    var v = readStoredVisible();
+    applyVisible(v === null ? !mq.matches : v);
+  });
+  window.addEventListener('resize', syncTopbarHeight);
+})();
+</script>
+
+</body>
+</html>
