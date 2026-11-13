@@ -10,3 +10,21 @@ wheels/
 .venv
 # ok_son add by 20260703
 ai_agent/blog/
+
+/ai_agent/blog_agent/output/클로드코드-핵심기능-5가지/research.md
+/ai_agent/blog_agent/backup/assembler_샘플.md
+/ai_agent/blog_agent/backup/CLAUDE_샘플.md
+/ai_agent/blog_agent/backup/image-guide_샘플.md
+/ai_agent/blog_agent/backup/image-maker_샘플.md
+/ai_agent/blog_agent/backup/style-guide_샘플.md
+/ai_agent/blog_agent/doc/trip_seo_guide.md
+/ai_agent/blog_agent/output/클로드코드-핵심기능-5가지/images/body-1.png
+/ai_agent/blog_agent/output/클로드코드-핵심기능-5가지/images/body-2.png
+/ai_agent/blog_agent/output/클로드코드-핵심기능-5가지/images/body-3.png
+/ai_agent/blog_agent/output/클로드코드-핵심기능-5가지/images/body-4.png
+/ai_agent/blog_agent/output/클로드코드-핵심기능-5가지/images/body-5.png
+/ai_agent/blog_agent/output/클로드코드-핵심기능-5가지/images/body-6.png
+/ai_agent/blog_agent/output/클로드코드-핵심기능-5가지/images/thumbnail.png
+/ai_agent/blog_agent/output/클로드코드-핵심기능-5가지/draft.md
+/ai_agent/blog_agent/output/클로드코드-핵심기능-5가지/final.html
+/ai_agent/blog_agent/output/클로드코드-핵심기능-5가지/final.md
